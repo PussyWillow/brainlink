@@ -6,24 +6,21 @@
     <title>BrainLink Web Reader + AI Coach</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- הוספת ספריית Socket.io לתקשורת עם Node.js -->
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .meter-fill { transition: width 0.5s ease-out, background-color 0.5s; }
-        /* אנימציה לטעינה */
         .loader {
             border: 3px solid #f3f3f3;
             border-radius: 50%;
             border-top: 3px solid #6366f1;
             width: 20px;
             height: 20px;
-            -webkit-animation: spin 1s linear infinite; /* Safari */
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* אנימציה לדופק נתונים */
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes pulse-yellow {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.5); opacity: 0.5; }
@@ -31,361 +28,167 @@
         }
         .data-pulse {
             animation: pulse-yellow 0.2s ease-out;
-            background-color: #fbbf24 !important; /* Yellow-400 */
+            background-color: #fbbf24 !important;
         }
-        /* סגנון לגרף הספקטרום */
         .spectrum-bar-container {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            height: 100px;
-            width: 100%;
-            background-color: #f3f4f6;
-            border-radius: 4px;
-            overflow: hidden;
-            position: relative;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            height: 100px; width: 100%; background-color: #f3f4f6;
+            border-radius: 4px; overflow: hidden; position: relative;
         }
         .spectrum-bar {
-            width: 100%;
-            transition: height 0.3s ease;
-            border-top-left-radius: 4px;
-            border-top-right-radius: 4px;
+            width: 100%; transition: height 0.3s ease;
+            border-top-left-radius: 4px; border-top-right-radius: 4px;
         }
-        /* מסוף לוגים */
-        .console-text {
-            font-family: 'Courier New', Courier, monospace;
-        }
+        .console-text { font-family: 'Courier New', Courier, monospace; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
 
-    <!-- כותרת ראשית -->
+    <!-- כותרת -->
     <header class="w-full max-w-md bg-white rounded-xl shadow-lg p-6 mb-6 text-center border-b-4 border-indigo-500 relative">
         <div class="absolute top-4 left-4 flex items-center gap-2">
             <span class="text-xs text-gray-400 font-mono">RX</span>
-            <div id="rxLight" class="w-3 h-3 rounded-full bg-gray-200 border border-gray-300 transition-colors" title="נורית חיווי לקבלת נתונים"></div>
+            <div id="rxLight" class="w-3 h-3 rounded-full bg-gray-200 border border-gray-300 transition-colors"></div>
         </div>
-        
         <h1 class="text-2xl font-bold text-gray-800 mb-2">🧠 BrainLink Reader <span class="text-indigo-500">+ AI ✨</span></h1>
-        <p class="text-sm text-gray-500">חיבור ישיר לדפדפן (Web Serial Priority)</p>
+        <p class="text-sm text-gray-500">Node.js Bridge Edition</p>
         
-        <!-- סטטוס חיבור -->
         <div id="statusIndicator" class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium">
-            <span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>
-            מנותק
-        </div>
-        
-        <!-- הודעת אזהרה דינמית -->
-        <div id="errorMsg" class="hidden mt-4 bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 text-right text-sm" role="alert">
-            <p class="font-bold">⚠️ סטטוס חיבור:</p>
-            <p id="errorText">...</p>
+            <span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק
         </div>
     </header>
 
-    <!-- מודל עזרה (מוצג תמיד בהתחלה או לפי דרישה) -->
-    <div id="helpInfo" class="w-full max-w-md bg-blue-50 p-4 rounded-xl border border-blue-200 mb-6 text-sm text-blue-900">
-        <h3 class="font-bold mb-2"><i class="fa-solid fa-circle-info"></i> הנחיות ל-BrainLink Lite:</h3>
-        <ol class="list-decimal list-inside space-y-1">
-            <li>ודאי שהמכשיר <strong>מצומד (Paired)</strong> בהגדרות ה-Bluetooth של המחשב/Mac.</li>
-            <li>ודאי שהנורה במכשיר מהבהבת (או דולקת קבוע אם כבר מצומד).</li>
-            <li>בחרי מהירות (לרוב <strong>57600</strong>, ישנים: 9600).</li>
-            <li>לחצי על הכפתור הכחול הגדול למטה.</li>
-        </ol>
-    </div>
-
-    <!-- כפתורי שליטה - דגש על Serial -->
+    <!-- כפתורים -->
     <div class="flex flex-col gap-3 mb-8 w-full max-w-xs">
         
-        <!-- איזור בחירת מהירות וכפתור COM (ראשי) -->
-        <div class="flex gap-2 w-full">
-            <select id="baudRate" class="bg-white border border-indigo-300 text-indigo-900 text-lg font-bold rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 w-1/3 text-center dir-ltr">
-                <option value="57600">57600</option>
-                <option value="9600">9600</option>
-                <option value="1200">1200</option> <!-- לדיבאג קיצוני -->
-            </select>
-            
-            <button id="serialBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2 text-lg">
-                <i class="fa-solid fa-plug"></i>
-                התחבר (COM)
+        <!-- כפתור Node.js -->
+        <button id="nodeBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2 text-lg">
+            <i class="fa-brands fa-node-js"></i>
+            התחבר דרך Node.js
+        </button>
+
+        <div class="text-center text-xs text-gray-400 mt-2">- אפשרויות גיבוי (לדפדפן בלבד) -</div>
+
+        <div class="flex gap-2">
+            <button id="serialBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                <i class="fa-solid fa-plug"></i> Web Serial
+            </button>
+            <button id="connectBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                <i class="fa-brands fa-bluetooth-b"></i> Web BLE
             </button>
         </div>
-
-        <div class="text-center text-xs text-gray-400 mt-2 mb-2">- אפשרויות משניות -</div>
-
-        <!-- כפתור בלוטוס (משני) -->
-        <button id="connectBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-2 px-6 rounded-lg flex items-center justify-center gap-2 text-sm">
-            <i class="fa-brands fa-bluetooth-b"></i>
-            התחבר BLE (רק לדגמים חדשים)
-        </button>
         
-        <!-- כפתור סימולציה -->
-        <button id="simBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-2 px-6 rounded-lg flex items-center justify-center gap-2 text-sm">
-            <i class="fa-solid fa-flask"></i>
-            סימולציה
+        <button id="simBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg text-sm flex items-center justify-center gap-2">
+            <i class="fa-solid fa-flask"></i> סימולציה
         </button>
     </div>
 
-    <!-- צג נתונים גולמיים (פתוח כברירת מחדל לדיבאג) -->
+    <!-- צג נתונים גולמיים -->
     <div class="w-full max-w-md mb-6">
         <div class="flex justify-between items-end mb-1 px-1">
-            <span class="text-xs font-bold text-gray-500">RAW DATA MONITOR (HEX)</span>
-            <button onclick="document.getElementById('rawMonitorContent').innerHTML = 'ממתין...'" class="text-xs text-red-400 hover:text-red-600">נקה מסך</button>
+            <span class="text-xs font-bold text-gray-500">RAW DATA (HEX)</span>
+            <button onclick="document.getElementById('rawMonitorContent').innerHTML = '...'" class="text-xs text-red-400">נקה</button>
         </div>
-        <div class="bg-black text-green-400 p-3 rounded-lg font-mono text-xs h-32 overflow-y-auto dir-ltr text-left shadow-inner border border-gray-700 relative">
-            <div id="rawMonitorContent" class="break-all console-text">ממתין לחיבור...</div>
+        <div class="bg-black text-green-400 p-3 rounded-lg font-mono text-xs h-24 overflow-y-auto dir-ltr text-left shadow-inner border border-gray-700">
+            <div id="rawMonitorContent" class="break-all console-text">ממתין...</div>
         </div>
-        <p class="text-[10px] text-gray-400 mt-1 text-center">אם את רואה מספרים רצים אבל הגרפים לא זזים - המהירות (Baud) לא נכונה.</p>
     </div>
 
-    <!-- אזור תצוגת נתונים (AI וגרפים) -->
+    <!-- גרפים ו-AI -->
     <div id="dataContainer" class="w-full max-w-md space-y-6 opacity-50 pointer-events-none transition-opacity duration-300">
         
-        <!-- AI Coach -->
-        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl shadow-md border border-indigo-100 relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400"></div>
-            <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-robot text-purple-600"></i>
-                הנוירו-מאמן
-            </h2>
-            <div id="aiResponseArea" class="hidden bg-white p-4 rounded-lg border border-purple-100 mb-4 text-gray-700 text-sm leading-relaxed shadow-inner"></div>
-            <button id="analyzeBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
-                <span>✨ נתח את המצב שלי</span>
-                <div id="loadingSpinner" class="loader hidden"></div>
+        <!-- AI -->
+        <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-purple-500">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">הנוירו-מאמן</h2>
+            <div id="aiResponseArea" class="hidden bg-gray-50 p-3 rounded text-sm text-gray-700 mb-3"></div>
+            <button id="analyzeBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded transition">
+                ✨ נתח מצב נוכחי
             </button>
         </div>
 
         <!-- מדדים -->
         <div class="grid grid-cols-2 gap-4">
-            <!-- מד ריכוז -->
-            <div class="bg-white p-4 rounded-xl shadow-md">
-                <h2 class="text-sm font-semibold text-gray-500 mb-1">🎯 ריכוז</h2>
-                <span id="attentionValue" class="text-3xl font-bold text-indigo-600 block mb-2">0</span>
-                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div id="attentionBar" class="meter-fill bg-indigo-500 h-2 rounded-full" style="width: 0%"></div>
-                </div>
+            <div class="bg-white p-4 rounded-xl shadow text-center">
+                <h2 class="text-xs text-gray-500">ריכוז</h2>
+                <span id="attentionValue" class="text-3xl font-bold text-indigo-600 block">0</span>
+                <div class="w-full bg-gray-200 h-2 mt-2 rounded-full"><div id="attentionBar" class="h-2 bg-indigo-500 rounded-full" style="width: 0%"></div></div>
             </div>
-
-            <!-- מד רגיעה -->
-            <div class="bg-white p-4 rounded-xl shadow-md">
-                <h2 class="text-sm font-semibold text-gray-500 mb-1">🧘 רגיעה</h2>
-                <span id="meditationValue" class="text-3xl font-bold text-teal-600 block mb-2">0</span>
-                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div id="meditationBar" class="meter-fill bg-teal-500 h-2 rounded-full" style="width: 0%"></div>
-                </div>
+            <div class="bg-white p-4 rounded-xl shadow text-center">
+                <h2 class="text-xs text-gray-500">רגיעה</h2>
+                <span id="meditationValue" class="text-3xl font-bold text-teal-600 block">0</span>
+                <div class="w-full bg-gray-200 h-2 mt-2 rounded-full"><div id="meditationBar" class="h-2 bg-teal-500 rounded-full" style="width: 0%"></div></div>
             </div>
         </div>
         
         <!-- ספקטרום -->
-        <div class="bg-white p-6 rounded-xl shadow-md">
-            <h2 class="text-xs font-semibold text-gray-400 mb-4 uppercase tracking-wider">Spectrum Analysis</h2>
-            <div class="grid grid-cols-5 gap-2 text-center h-24 items-end">
-                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandDelta" class="spectrum-bar bg-gray-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Delta</span></div>
-                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandTheta" class="spectrum-bar bg-blue-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Theta</span></div>
-                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandAlpha" class="spectrum-bar bg-green-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Alpha</span></div>
-                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandBeta" class="spectrum-bar bg-yellow-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Beta</span></div>
-                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandGamma" class="spectrum-bar bg-red-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Gamma</span></div>
-            </div>
-        </div>
-
-        <!-- איכות אות -->
-        <div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center text-sm">
-            <span class="text-gray-600">איכות אות (Signal):</span>
-            <div id="signalStatus" class="flex items-center gap-2 text-gray-400">
-                <i class="fa-solid fa-circle-question"></i> לא ידוע
+        <div class="bg-white p-4 rounded-xl shadow">
+            <div class="grid grid-cols-5 gap-2 text-center h-20 items-end">
+                <div class="flex flex-col h-full justify-end gap-1"><div class="spectrum-bar-container h-full bg-gray-100 rounded"><div id="bandDelta" class="spectrum-bar bg-gray-400" style="height: 5%"></div></div><span class="text-[9px]">Delta</span></div>
+                <div class="flex flex-col h-full justify-end gap-1"><div class="spectrum-bar-container h-full bg-gray-100 rounded"><div id="bandTheta" class="spectrum-bar bg-blue-400" style="height: 5%"></div></div><span class="text-[9px]">Theta</span></div>
+                <div class="flex flex-col h-full justify-end gap-1"><div class="spectrum-bar-container h-full bg-gray-100 rounded"><div id="bandAlpha" class="spectrum-bar bg-green-400" style="height: 5%"></div></div><span class="text-[9px]">Alpha</span></div>
+                <div class="flex flex-col h-full justify-end gap-1"><div class="spectrum-bar-container h-full bg-gray-100 rounded"><div id="bandBeta" class="spectrum-bar bg-yellow-400" style="height: 5%"></div></div><span class="text-[9px]">Beta</span></div>
+                <div class="flex flex-col h-full justify-end gap-1"><div class="spectrum-bar-container h-full bg-gray-100 rounded"><div id="bandGamma" class="spectrum-bar bg-red-400" style="height: 5%"></div></div><span class="text-[9px]">Gamma</span></div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- GEMINI API SETUP ---
+        // API KEY
         const apiKey = ""; 
-        
-        // GLOBAL STATE
-        let currentAttention = 0;
-        let currentMeditation = 0;
+
+        // State
+        let currentAttention = 0, currentMeditation = 0;
         let isAnalyzing = false;
         let simulationInterval = null;
-        let serialReader = null;
-        let keepReading = false;
-        let lastDataTime = 0;
-        let watchdogInterval = null;
+        let socket = null;
 
-        // UI ELEMENTS
-        const connectBtn = document.getElementById('connectBtn');
-        const serialBtn = document.getElementById('serialBtn');
-        const simBtn = document.getElementById('simBtn');
+        // UI
         const statusIndicator = document.getElementById('statusIndicator');
         const dataContainer = document.getElementById('dataContainer');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const aiResponseArea = document.getElementById('aiResponseArea');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const errorMsg = document.getElementById('errorMsg');
-        const errorText = document.getElementById('errorText');
-        const baudRateSelect = document.getElementById('baudRate');
-        const rxLight = document.getElementById('rxLight');
         const rawMonitorContent = document.getElementById('rawMonitorContent');
-        
-        // BLE CONSTANTS (Backup)
-        const KNOWN_SERVICES = [0xFFE0, 0xAA80, "6e400001-b5a3-f393-e0a9-e50e24dcca9e"];
-        const KNOWN_CHARACTERISTICS = [0xFFE1, 0xAA81, "6e400003-b5a3-f393-e0a9-e50e24dcca9e"];
+        const rxLight = document.getElementById('rxLight');
 
-        // --- UTILS ---
-        function log(msg) { console.log(`[LOG] ${msg}`); }
-
-        function showError(msg) {
-            errorText.innerText = msg;
-            errorMsg.classList.remove('hidden');
-            setTimeout(() => errorMsg.classList.add('hidden'), 10000);
-        }
-
-        function flashRx() {
-            rxLight.classList.remove('data-pulse');
-            void rxLight.offsetWidth; 
-            rxLight.classList.add('data-pulse');
-        }
-
-        function appendRawDisplay(uint8Arr) {
-            // הופך מערך בייטים למחרוזת HEX ומציג
-            // כדי לא להכביד על הדפדפן, נחתוך אם ארוך מדי
-            const hexStr = Array.from(uint8Arr)
-                .map(b => b.toString(16).padStart(2, '0').toUpperCase())
-                .join(' ');
+        // --- NODE.JS BRIDGE CONNECTION ---
+        document.getElementById('nodeBtn').addEventListener('click', () => {
+            if(simulationInterval) clearInterval(simulationInterval);
             
-            rawMonitorContent.innerHTML += hexStr + " ";
-            
-            if (rawMonitorContent.innerText.length > 2000) {
-                rawMonitorContent.innerText = rawMonitorContent.innerText.slice(-500);
-            }
-            rawMonitorContent.parentElement.scrollTop = rawMonitorContent.parentElement.scrollHeight;
-        }
+            // מתחבר לשרת המקומי
+            socket = io('http://localhost:3000');
 
-        function startWatchdog() {
-            if (watchdogInterval) clearInterval(watchdogInterval);
-            lastDataTime = Date.now();
-            watchdogInterval = setInterval(() => {
-                const now = Date.now();
-                if (now - lastDataTime > 4000) {
-                     showError("אין נתונים (Silence). נסי לשנות מהירות Baud Rate.");
-                     clearInterval(watchdogInterval); 
+            socket.on('connect', () => {
+                updateStatus(true, 'Node Bridge');
+                console.log('Connected to Node Bridge');
+            });
+
+            socket.on('disconnect', () => {
+                updateStatus(false);
+                console.log('Disconnected from Node Bridge');
+            });
+
+            // קבלת נתונים מהגשר
+            socket.on('brain-data', (arrayBuffer) => {
+                const uint8View = new Uint8Array(arrayBuffer);
+                
+                // 1. תצוגה גולמית
+                appendRawDisplay(uint8View);
+                flashRx();
+
+                // 2. פענוח
+                for (let i = 0; i < uint8View.length; i++) {
+                    processByte(uint8View[i]);
                 }
-            }, 1000);
-        }
+            });
+        });
 
-        // --- WEB SERIAL LOGIC (THE MAIN EVENT) ---
-        async function connectSerial() {
-            if (!('serial' in navigator)) {
-                alert('דפדפן זה לא תומך ב-Web Serial. נא להשתמש ב-Chrome/Edge במחשב.');
-                return;
-            }
-            
-            if (simulationInterval) startSimulation(); // Stop Sim
-
-            const selectedBaud = parseInt(baudRateSelect.value);
-            
-            try {
-                log('Requesting Port...');
-                const port = await navigator.serial.requestPort();
-                
-                log(`Opening Port at ${selectedBaud}...`);
-                await port.open({ baudRate: selectedBaud }); 
-                
-                updateStatus(true, "Serial");
-                startWatchdog();
-                keepReading = true;
-                readSerialLoop(port);
-
-            } catch (err) {
-                console.error(err);
-                showError('שגיאת התחברות לפורט: ' + err.message);
-            }
-        }
-
-        async function readSerialLoop(port) {
-            const reader = port.readable.getReader();
-            serialReader = reader;
-            
-            try {
-                while (keepReading) {
-                    const { value, done } = await reader.read();
-                    if (done) { reader.releaseLock(); break; }
-                    
-                    if (value) {
-                        // 1. קודם כל - תיעוד גולמי! (הסטטוסקופ)
-                        // אנחנו מדפיסים לקונסול ולמסך *לפני* שהפארסר נוגע בזה
-                        console.log(value); 
-                        appendRawDisplay(value);
-                        flashRx();
-                        lastDataTime = Date.now();
-
-                        // 2. רק אז - שלח לפארסר
-                        for (let i = 0; i < value.length; i++) {
-                            processByte(value[i]);
-                        }
-                    }
-                }
-            } catch (error) {
-                log('Read Error: ' + error);
-                onDisconnected();
-            } finally {
-                reader.releaseLock();
-            }
-        }
-
-        // --- BLUETOOTH LOGIC (LEGACY / BLE MODELS) ---
-        async function connectBluetooth() {
-            if (simulationInterval) startSimulation();
-            try {
-                device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: KNOWN_SERVICES 
-                });
-                device.addEventListener('gattserverdisconnected', onDisconnected);
-                const server = await device.gatt.connect();
-                // חיפוש פשטני לשירות ראשון שעובד
-                const services = await server.getPrimaryServices();
-                let char = null;
-                for (const s of services) {
-                    const chars = await s.getCharacteristics();
-                    char = chars.find(c => c.properties.notify);
-                    if (char) break;
-                }
-                if (!char) throw new Error("No Notify Char Found");
-                
-                await char.startNotifications();
-                char.addEventListener('characteristicvaluechanged', (e) => {
-                    const val = new Uint8Array(e.target.value.buffer);
-                    appendRawDisplay(val); // גם פה נציג גולמי
-                    flashRx();
-                    val.forEach(processByte);
-                });
-                
-                updateStatus(true, "Bluetooth");
-            } catch (error) {
-                showError('BLE Error: ' + error.message);
-            }
-        }
-
-        function onDisconnected() {
-            updateStatus(false);
-            keepReading = false;
-            if (serialReader) serialReader.cancel();
-            if (watchdogInterval) clearInterval(watchdogInterval);
-            rawMonitorContent.innerHTML += "\n[מנותק]";
-        }
-
-        // --- PARSER (THINKGEAR PROTOCOL) ---
-        // Packet: [AA] [AA] [Length] [Payload...] [Checksum]
-        let state = 0; 
-        let payloadLength = 0;
-        let payload = [];
-        let payloadBytesRead = 0;
+        // --- PARSER ---
+        let state = 0, payloadLength = 0, payload = [], payloadBytesRead = 0;
 
         function processByte(byte) {
             switch (state) {
                 case 0: if (byte === 0xAA) state = 1; break;
                 case 1: if (byte === 0xAA) state = 2; else state = 0; break;
                 case 2: 
-                    if (byte > 169) state = 0; // Invalid length for ThinkGear usually
+                    if (byte > 169) state = 0;
                     else { payloadLength = byte; payload = []; payloadBytesRead = 0; state = 3; }
                     break;
                 case 3:
@@ -393,64 +196,44 @@
                     payloadBytesRead++;
                     if (payloadBytesRead === payloadLength) state = 4;
                     break;
-                case 4: 
-                    parsePacket(payload); 
-                    state = 0; 
-                    break;
+                case 4: parsePacket(payload); state = 0; break;
             }
         }
 
         function parsePacket(data) {
-            // הגיע פאקט מלא ותקין!
             let i = 0;
             while (i < data.length) {
                 const code = data[i];
-                if (code === 0x02) { updateSignal(data[i+1]); i += 2; }
+                if (code === 0x02) { i += 2; } // Signal quality
                 else if (code === 0x04) { updateMeter('attention', data[i+1]); i += 2; }
                 else if (code === 0x05) { updateMeter('meditation', data[i+1]); i += 2; }
                 else if (code === 0x80) { i += 3; } 
                 else if (code === 0x83) { 
-                    // ASIC EEG Power (24 bytes)
                     if (i + 25 <= data.length) {
                         parseSpectrum(data, i + 2);
                         i += 26; 
                     } else i++;
-                }
-                else { i++; }
+                } else { i++; }
             }
         }
 
         function parseSpectrum(data, offset) {
             const p3 = (o) => (data[o] << 16) | (data[o+1] << 8) | data[o+2];
-            const bands = {
-                delta: p3(offset),
-                theta: p3(offset + 3),
-                alpha: (p3(offset + 6) + p3(offset + 9)) / 2,
-                beta: (p3(offset + 12) + p3(offset + 15)) / 2,
-                gamma: (p3(offset + 18) + p3(offset + 21)) / 2
-            };
-            
             const norm = (v) => Math.min(100, Math.max(5, (Math.log10(v || 1) - 3) * 25));
             
-            document.getElementById('bandDelta').style.height = norm(bands.delta) + '%';
-            document.getElementById('bandTheta').style.height = norm(bands.theta) + '%';
-            document.getElementById('bandAlpha').style.height = norm(bands.alpha) + '%';
-            document.getElementById('bandBeta').style.height = norm(bands.beta) + '%';
-            document.getElementById('bandGamma').style.height = norm(bands.gamma) + '%';
+            document.getElementById('bandDelta').style.height = norm(p3(offset)) + '%';
+            document.getElementById('bandTheta').style.height = norm(p3(offset+3)) + '%';
+            document.getElementById('bandAlpha').style.height = norm((p3(offset+6)+p3(offset+9))/2) + '%';
+            document.getElementById('bandBeta').style.height = norm((p3(offset+12)+p3(offset+15))/2) + '%';
+            document.getElementById('bandGamma').style.height = norm((p3(offset+18)+p3(offset+21))/2) + '%';
         }
 
-        // --- UI UPDATERS ---
+        // --- HELPERS ---
         function updateStatus(connected, type) {
             if (connected) {
-                let text = type === "Simulated" ? "סימולציה" : (type === "Serial" ? "מחובר (COM)" : "מחובר (BLE)");
-                let color = type === "Simulated" ? "bg-blue-500" : "bg-green-500";
-                
-                statusIndicator.innerHTML = `<span class="w-2 h-2 rounded-full ${color} ml-2"></span>${text}`;
+                statusIndicator.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 ml-2"></span>מחובר (${type})`;
                 statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium";
-                
                 dataContainer.classList.remove('opacity-50', 'pointer-events-none');
-                document.getElementById('helpInfo').classList.add('hidden'); // Hide help on connect
-                errorMsg.classList.add('hidden');
             } else {
                 statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
                 statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
@@ -461,75 +244,58 @@
         function updateMeter(type, value) {
             if (type === 'attention') currentAttention = value;
             if (type === 'meditation') currentMeditation = value;
-            const valEl = document.getElementById(type + 'Value');
-            const barEl = document.getElementById(type + 'Bar');
-            if(valEl && barEl) {
-                valEl.textContent = value;
-                barEl.style.width = value + '%';
-            }
+            document.getElementById(type + 'Value').innerText = value;
+            document.getElementById(type + 'Bar').style.width = value + '%';
         }
 
-        function updateSignal(value) {
-            const el = document.getElementById('signalStatus');
-            if (value === 0) el.innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-wifi"></i> מצוין</span>';
-            else if (value < 50) el.innerHTML = '<span class="text-yellow-600">רעש קל</span>';
-            else if (value === 200) el.innerHTML = '<span class="text-red-600">לא על הראש</span>';
-            else el.innerHTML = '<span class="text-orange-600">אות חלש (' + value + ')</span>';
+        function flashRx() {
+            rxLight.classList.remove('data-pulse');
+            void rxLight.offsetWidth; 
+            rxLight.classList.add('data-pulse');
+        }
+
+        function appendRawDisplay(uint8Arr) {
+            const hex = Array.from(uint8Arr).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+            rawMonitorContent.innerText += hex + " ";
+            if(rawMonitorContent.innerText.length > 500) rawMonitorContent.innerText = rawMonitorContent.innerText.slice(-200);
+            rawMonitorContent.parentElement.scrollTop = rawMonitorContent.parentElement.scrollHeight;
         }
 
         // --- SIMULATION ---
-        function startSimulation() {
-            if (simulationInterval) {
-                clearInterval(simulationInterval);
-                simulationInterval = null;
-                simBtn.classList.remove('bg-blue-200');
-                onDisconnected();
-                return;
-            }
-            simBtn.classList.add('bg-blue-200');
+        document.getElementById('simBtn').addEventListener('click', () => {
+            if (simulationInterval) { clearInterval(simulationInterval); simulationInterval = null; updateStatus(false); return; }
             updateStatus(true, "Simulated");
             simulationInterval = setInterval(() => {
-                const r = () => Math.floor(Math.random() * 100);
-                updateMeter('attention', r());
-                updateMeter('meditation', r());
-                appendRawDisplay(new Uint8Array([0xAA, 0xAA, 0x04, 0x80, 0x02, 0x00, 0x15, 0x23])); // Fake packet
+                const r = () => Math.floor(Math.random()*100);
+                updateMeter('attention', r()); updateMeter('meditation', r());
+                appendRawDisplay(new Uint8Array([0xAA, Math.random()*255]));
                 flashRx();
-            }, 800);
-        }
+            }, 500);
+        });
 
         // --- AI ---
-        async function analyzeBrainWaves() {
-            if (isAnalyzing) return;
-            isAnalyzing = true;
-            loadingSpinner.classList.remove('hidden');
-            analyzeBtn.disabled = true;
-            aiResponseArea.classList.add('hidden');
-            
-            const prompt = `User EEG: Focus ${currentAttention}, Relax ${currentMeditation}. Brief advice in Hebrew?`;
-            
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const area = document.getElementById('aiResponseArea');
+            area.classList.remove('hidden');
+            area.innerText = "חושב...";
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `User EEG: Focus ${currentAttention}, Relax ${currentMeditation}. One sentence advice in Hebrew.` }] }] })
                 });
-                const data = await response.json();
-                aiResponseArea.innerHTML = data.candidates[0].content.parts[0].text;
-                aiResponseArea.classList.remove('hidden');
-            } catch (e) {
-                aiResponseArea.innerHTML = "שגיאה בחיבור ל-AI";
-                aiResponseArea.classList.remove('hidden');
-            } finally {
-                isAnalyzing = false;
-                loadingSpinner.classList.add('hidden');
-                analyzeBtn.disabled = false;
-            }
-        }
+                const data = await res.json();
+                area.innerText = data.candidates[0].content.parts[0].text;
+            } catch(e) { area.innerText = "שגיאה ב-AI"; }
+        });
 
-        connectBtn.addEventListener('click', connectBluetooth);
-        serialBtn.addEventListener('click', connectSerial);
-        simBtn.addEventListener('click', startSimulation);
-        analyzeBtn.addEventListener('click', analyzeBrainWaves);
+        // Legacy Handlers
+        document.getElementById('serialBtn').addEventListener('click', async () => {
+            try { const port = await navigator.serial.requestPort(); await port.open({baudRate: 57600}); updateStatus(true, 'Serial'); }
+            catch(e) { alert('חסום בדפדפן זה. השתמשי בכפתור הירוק (Node.js)!'); }
+        });
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+             alert('Web Bluetooth לרוב לא עובד עם BrainLink Lite הישן. עדיף Node.js.');
+        });
 
     </script>
 </body>
