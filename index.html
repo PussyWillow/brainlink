@@ -51,6 +51,10 @@
             border-top-left-radius: 4px;
             border-top-right-radius: 4px;
         }
+        /* מסוף לוגים */
+        .console-text {
+            font-family: 'Courier New', Courier, monospace;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
@@ -63,7 +67,7 @@
         </div>
         
         <h1 class="text-2xl font-bold text-gray-800 mb-2">🧠 BrainLink Reader <span class="text-indigo-500">+ AI ✨</span></h1>
-        <p class="text-sm text-gray-500">חיבור ישיר לדפדפן בשילוב מאמן בינה מלאכותית</p>
+        <p class="text-sm text-gray-500">חיבור ישיר לדפדפן (Web Serial Priority)</p>
         
         <!-- סטטוס חיבור -->
         <div id="statusIndicator" class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium">
@@ -73,221 +77,145 @@
         
         <!-- הודעת אזהרה דינמית -->
         <div id="errorMsg" class="hidden mt-4 bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 text-right text-sm" role="alert">
-            <p class="font-bold">⚠️ שים לב:</p>
-            <p id="errorText">נא לוודא שהמכשיר דלוק.</p>
+            <p class="font-bold">⚠️ סטטוס חיבור:</p>
+            <p id="errorText">...</p>
         </div>
-        
-        <!-- כפתור עזרה במקרה של אי-מציאת מכשיר -->
-        <button onclick="document.getElementById('helpModal').classList.remove('hidden')" class="mt-2 text-xs text-indigo-600 underline hover:text-indigo-800">
-            לא מצליחה להתחבר? לחצי כאן לעזרה
-        </button>
     </header>
 
-    <!-- מודל עזרה -->
-    <div id="helpModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center z-50">
-        <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-sm">
-            <h3 class="text-lg font-bold mb-4 text-indigo-600">מדריך חיבור מהיר</h3>
-            
-            <div class="mb-4">
-                <h4 class="font-bold text-gray-800">אפשרות א': חיבור בלוטוס ישיר (מומלץ לנייד)</h4>
-                <ul class="list-disc list-inside text-sm text-gray-600">
-                    <li>ודאי שהמכשיר <strong>לא מחובר</strong> להגדרות ה-Bluetooth במחשב ("Unpair").</li>
-                    <li>לחצי על "התחבר בלוטוס".</li>
-                </ul>
-            </div>
-
-            <div class="mb-4 border-t pt-4">
-                <h4 class="font-bold text-gray-800">אפשרות ב': חיבור Serial/COM (למחשב)</h4>
-                <ul class="list-disc list-inside text-sm text-gray-600">
-                    <li>ודאי שהמכשיר <strong>כן מחובר</strong> (Paired) בהגדרות ה-Bluetooth של המחשב.</li>
-                    <li>נסי קודם את מהירות 57600. אם מתחבר אך אין גרפים, נתקי ונסי 9600.</li>
-                </ul>
-            </div>
-            
-            <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold py-2 px-4 rounded">
-                הבנתי, תודה
-            </button>
-        </div>
+    <!-- מודל עזרה (מוצג תמיד בהתחלה או לפי דרישה) -->
+    <div id="helpInfo" class="w-full max-w-md bg-blue-50 p-4 rounded-xl border border-blue-200 mb-6 text-sm text-blue-900">
+        <h3 class="font-bold mb-2"><i class="fa-solid fa-circle-info"></i> הנחיות ל-BrainLink Lite:</h3>
+        <ol class="list-decimal list-inside space-y-1">
+            <li>ודאי שהמכשיר <strong>מצומד (Paired)</strong> בהגדרות ה-Bluetooth של המחשב/Mac.</li>
+            <li>ודאי שהנורה במכשיר מהבהבת (או דולקת קבוע אם כבר מצומד).</li>
+            <li>בחרי מהירות (לרוב <strong>57600</strong>, ישנים: 9600).</li>
+            <li>לחצי על הכפתור הכחול הגדול למטה.</li>
+        </ol>
     </div>
 
-    <!-- כפתורי שליטה -->
+    <!-- כפתורי שליטה - דגש על Serial -->
     <div class="flex flex-col gap-3 mb-8 w-full max-w-xs">
-        <!-- כפתור בלוטוס -->
-        <button id="connectBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2">
-            <i class="fa-brands fa-bluetooth-b"></i>
-            התחבר בלוטוס (BLE)
-        </button>
         
-        <!-- איזור בחירת מהירות וכפתור COM -->
+        <!-- איזור בחירת מהירות וכפתור COM (ראשי) -->
         <div class="flex gap-2 w-full">
-            <select id="baudRate" class="bg-white border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 w-1/3 text-center dir-ltr">
+            <select id="baudRate" class="bg-white border border-indigo-300 text-indigo-900 text-lg font-bold rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 w-1/3 text-center dir-ltr">
                 <option value="57600">57600</option>
                 <option value="9600">9600</option>
+                <option value="1200">1200</option> <!-- לדיבאג קיצוני -->
             </select>
             
-            <button id="serialBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2 text-sm">
+            <button id="serialBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-4 rounded-lg shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2 text-lg">
                 <i class="fa-solid fa-plug"></i>
-                התחבר COM
+                התחבר (COM)
             </button>
         </div>
+
+        <div class="text-center text-xs text-gray-400 mt-2 mb-2">- אפשרויות משניות -</div>
+
+        <!-- כפתור בלוטוס (משני) -->
+        <button id="connectBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-2 px-6 rounded-lg flex items-center justify-center gap-2 text-sm">
+            <i class="fa-brands fa-bluetooth-b"></i>
+            התחבר BLE (רק לדגמים חדשים)
+        </button>
         
         <!-- כפתור סימולציה -->
-        <button id="simBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full shadow transform transition hover:scale-105 flex items-center justify-center gap-2 text-sm">
+        <button id="simBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-2 px-6 rounded-lg flex items-center justify-center gap-2 text-sm">
             <i class="fa-solid fa-flask"></i>
-            מצב סימולציה
+            סימולציה
         </button>
     </div>
 
-    <!-- אזור תצוגת נתונים -->
+    <!-- צג נתונים גולמיים (פתוח כברירת מחדל לדיבאג) -->
+    <div class="w-full max-w-md mb-6">
+        <div class="flex justify-between items-end mb-1 px-1">
+            <span class="text-xs font-bold text-gray-500">RAW DATA MONITOR (HEX)</span>
+            <button onclick="document.getElementById('rawMonitorContent').innerHTML = 'ממתין...'" class="text-xs text-red-400 hover:text-red-600">נקה מסך</button>
+        </div>
+        <div class="bg-black text-green-400 p-3 rounded-lg font-mono text-xs h-32 overflow-y-auto dir-ltr text-left shadow-inner border border-gray-700 relative">
+            <div id="rawMonitorContent" class="break-all console-text">ממתין לחיבור...</div>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-1 text-center">אם את רואה מספרים רצים אבל הגרפים לא זזים - המהירות (Baud) לא נכונה.</p>
+    </div>
+
+    <!-- אזור תצוגת נתונים (AI וגרפים) -->
     <div id="dataContainer" class="w-full max-w-md space-y-6 opacity-50 pointer-events-none transition-opacity duration-300">
         
-        <!-- כרטיסיית ה-AI החדשה -->
+        <!-- AI Coach -->
         <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl shadow-md border border-indigo-100 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400"></div>
             <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
                 <i class="fa-solid fa-robot text-purple-600"></i>
-                הנוירו-מאמן האישי שלך
+                הנוירו-מאמן
             </h2>
-            <p class="text-sm text-gray-600 mb-4">
-                ה-AI ינתח את גלי המוח שלך בזמן אמת וייתן לך טיפים לשיפור המיקוד או הרגיעה.
-            </p>
-            
-            <div id="aiResponseArea" class="hidden bg-white p-4 rounded-lg border border-purple-100 mb-4 text-gray-700 text-sm leading-relaxed shadow-inner">
-                <!-- כאן תופיע תשובת ה-AI -->
-            </div>
-
+            <div id="aiResponseArea" class="hidden bg-white p-4 rounded-lg border border-purple-100 mb-4 text-gray-700 text-sm leading-relaxed shadow-inner"></div>
             <button id="analyzeBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow transition flex items-center justify-center gap-2">
-                <span>✨ נתח את המצב שלי עכשיו</span>
+                <span>✨ נתח את המצב שלי</span>
                 <div id="loadingSpinner" class="loader hidden"></div>
             </button>
         </div>
 
-        <!-- מד ריכוז -->
-        <div class="bg-white p-6 rounded-xl shadow-md">
-            <div class="flex justify-between items-end mb-2">
-                <h2 class="text-lg font-semibold text-gray-700">🎯 ריכוז (Attention)</h2>
-                <span id="attentionValue" class="text-3xl font-bold text-indigo-600">0</span>
+        <!-- מדדים -->
+        <div class="grid grid-cols-2 gap-4">
+            <!-- מד ריכוז -->
+            <div class="bg-white p-4 rounded-xl shadow-md">
+                <h2 class="text-sm font-semibold text-gray-500 mb-1">🎯 ריכוז</h2>
+                <span id="attentionValue" class="text-3xl font-bold text-indigo-600 block mb-2">0</span>
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div id="attentionBar" class="meter-fill bg-indigo-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
             </div>
-            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                <div id="attentionBar" class="meter-fill bg-indigo-500 h-4 rounded-full" style="width: 0%"></div>
-            </div>
-        </div>
 
-        <!-- מד רגיעה -->
-        <div class="bg-white p-6 rounded-xl shadow-md">
-            <div class="flex justify-between items-end mb-2">
-                <h2 class="text-lg font-semibold text-gray-700">🧘 רגיעה (Meditation)</h2>
-                <span id="meditationValue" class="text-3xl font-bold text-teal-600">0</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                <div id="meditationBar" class="meter-fill bg-teal-500 h-4 rounded-full" style="width: 0%"></div>
+            <!-- מד רגיעה -->
+            <div class="bg-white p-4 rounded-xl shadow-md">
+                <h2 class="text-sm font-semibold text-gray-500 mb-1">🧘 רגיעה</h2>
+                <span id="meditationValue" class="text-3xl font-bold text-teal-600 block mb-2">0</span>
+                <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div id="meditationBar" class="meter-fill bg-teal-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
             </div>
         </div>
         
-        <!-- ספקטרום גלי מוח (חדש!) -->
+        <!-- ספקטרום -->
         <div class="bg-white p-6 rounded-xl shadow-md">
-            <h2 class="text-lg font-semibold text-gray-700 mb-4">🌈 ספקטרום גלי מוח</h2>
-            <div class="grid grid-cols-5 gap-2 text-center h-32 items-end">
-                
-                <!-- Delta -->
-                <div class="flex flex-col gap-1 h-full justify-end">
-                    <div class="spectrum-bar-container">
-                        <div id="bandDelta" class="spectrum-bar bg-gray-400" style="height: 10%;"></div>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500">Delta</span>
-                    <span class="text-[10px] text-gray-400">שינה</span>
-                </div>
-
-                <!-- Theta -->
-                <div class="flex flex-col gap-1 h-full justify-end">
-                    <div class="spectrum-bar-container">
-                        <div id="bandTheta" class="spectrum-bar bg-blue-400" style="height: 10%;"></div>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500">Theta</span>
-                    <span class="text-[10px] text-gray-400">דמיון</span>
-                </div>
-
-                <!-- Alpha -->
-                <div class="flex flex-col gap-1 h-full justify-end">
-                    <div class="spectrum-bar-container">
-                        <div id="bandAlpha" class="spectrum-bar bg-green-400" style="height: 10%;"></div>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500">Alpha</span>
-                    <span class="text-[10px] text-gray-400">רגיעה</span>
-                </div>
-
-                <!-- Beta -->
-                <div class="flex flex-col gap-1 h-full justify-end">
-                    <div class="spectrum-bar-container">
-                        <div id="bandBeta" class="spectrum-bar bg-yellow-400" style="height: 10%;"></div>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500">Beta</span>
-                    <span class="text-[10px] text-gray-400">מיקוד</span>
-                </div>
-
-                <!-- Gamma -->
-                <div class="flex flex-col gap-1 h-full justify-end">
-                    <div class="spectrum-bar-container">
-                        <div id="bandGamma" class="spectrum-bar bg-red-400" style="height: 10%;"></div>
-                    </div>
-                    <span class="text-xs font-bold text-gray-500">Gamma</span>
-                    <span class="text-[10px] text-gray-400">תובנה</span>
-                </div>
-
+            <h2 class="text-xs font-semibold text-gray-400 mb-4 uppercase tracking-wider">Spectrum Analysis</h2>
+            <div class="grid grid-cols-5 gap-2 text-center h-24 items-end">
+                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandDelta" class="spectrum-bar bg-gray-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Delta</span></div>
+                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandTheta" class="spectrum-bar bg-blue-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Theta</span></div>
+                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandAlpha" class="spectrum-bar bg-green-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Alpha</span></div>
+                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandBeta" class="spectrum-bar bg-yellow-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Beta</span></div>
+                <div class="flex flex-col gap-1 h-full justify-end"><div class="spectrum-bar-container"><div id="bandGamma" class="spectrum-bar bg-red-400" style="height: 5%;"></div></div><span class="text-[9px] text-gray-400">Gamma</span></div>
             </div>
         </div>
 
         <!-- איכות אות -->
-        <div class="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
+        <div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center text-sm">
             <span class="text-gray-600">איכות אות (Signal):</span>
             <div id="signalStatus" class="flex items-center gap-2 text-gray-400">
                 <i class="fa-solid fa-circle-question"></i> לא ידוע
             </div>
         </div>
-
-        <!-- צג נתונים גולמיים (לדיבאג) -->
-        <div class="mt-8 w-full">
-            <button onclick="toggleRawMonitor()" class="text-xs text-gray-500 underline mb-2 w-full text-center hover:text-indigo-600">
-                <i class="fa-solid fa-bug"></i> לא רואה כלום? לחצי כאן לצג הנתונים הגולמיים
-            </button>
-            <div id="rawMonitorContainer" class="hidden">
-                <div class="bg-gray-800 text-green-400 p-3 rounded-lg font-mono text-xs h-32 overflow-y-auto dir-ltr text-left shadow-inner">
-                    <div class="text-gray-500 border-b border-gray-700 pb-1 mb-1">RAW DATA STREAM (HEX):</div>
-                    <div id="rawMonitorContent" class="break-all">ממתין לנתונים...</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- לוג דיבאג ישן -->
-        <div class="mt-4">
-            <button onclick="document.getElementById('debugLog').classList.toggle('hidden')" class="text-xs text-gray-400 underline mb-2">הצג/הסתר לוג מערכת</button>
-            <div id="debugLog" class="hidden h-32 overflow-y-auto bg-gray-900 text-gray-300 text-xs p-3 rounded font-mono font-left dir-ltr text-left"></div>
-        </div>
     </div>
 
     <script>
         // --- GEMINI API SETUP ---
-        const apiKey = ""; // API Key injected by environment
+        const apiKey = ""; 
         
-        // משתנים גלובליים למצב המוח
+        // GLOBAL STATE
         let currentAttention = 0;
         let currentMeditation = 0;
         let isAnalyzing = false;
         let simulationInterval = null;
         let serialReader = null;
         let keepReading = false;
-        
-        // משתני דיבאג ו-Watchdog
         let lastDataTime = 0;
         let watchdogInterval = null;
 
-        // אלמנטים ב-DOM
+        // UI ELEMENTS
         const connectBtn = document.getElementById('connectBtn');
         const serialBtn = document.getElementById('serialBtn');
         const simBtn = document.getElementById('simBtn');
         const statusIndicator = document.getElementById('statusIndicator');
         const dataContainer = document.getElementById('dataContainer');
-        const debugLog = document.getElementById('debugLog');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const aiResponseArea = document.getElementById('aiResponseArea');
         const loadingSpinner = document.getElementById('loadingSpinner');
@@ -297,167 +225,56 @@
         const rxLight = document.getElementById('rxLight');
         const rawMonitorContent = document.getElementById('rawMonitorContent');
         
-        // משתנים לבלוטוס
-        let device, server, service, characteristic;
-        
-        const KNOWN_SERVICES = [
-            0xFFE0, 0xAA80, "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "0000ffe0-0000-1000-8000-00805f9b34fb"
-        ];
-        const KNOWN_CHARACTERISTICS = [
-            0xFFE1, 0xAA81, "6e400003-b5a3-f393-e0a9-e50e24dcca9e", "0000ffe1-0000-1000-8000-00805f9b34fb"
-        ];
+        // BLE CONSTANTS (Backup)
+        const KNOWN_SERVICES = [0xFFE0, 0xAA80, "6e400001-b5a3-f393-e0a9-e50e24dcca9e"];
+        const KNOWN_CHARACTERISTICS = [0xFFE1, 0xAA81, "6e400003-b5a3-f393-e0a9-e50e24dcca9e"];
 
-        function log(msg) {
-            const time = new Date().toLocaleTimeString();
-            debugLog.innerHTML += `[${time}] ${msg}<br>`;
-            debugLog.scrollTop = debugLog.scrollHeight;
-            console.log(msg);
-        }
+        // --- UTILS ---
+        function log(msg) { console.log(`[LOG] ${msg}`); }
 
         function showError(msg) {
             errorText.innerText = msg;
             errorMsg.classList.remove('hidden');
-            // אם זו שגיאה של "חטיפה" או דממה, נשאיר להרבה זמן
-            const duration = msg.includes('דממה') || msg.includes('חטף') ? 15000 : 8000;
-            setTimeout(() => errorMsg.classList.add('hidden'), duration);
+            setTimeout(() => errorMsg.classList.add('hidden'), 10000);
         }
 
         function flashRx() {
             rxLight.classList.remove('data-pulse');
-            void rxLight.offsetWidth; // Trigger reflow
+            void rxLight.offsetWidth; 
             rxLight.classList.add('data-pulse');
         }
 
-        function toggleRawMonitor() {
-            const el = document.getElementById('rawMonitorContainer');
-            el.classList.toggle('hidden');
-        }
-
-        function appendRawData(byte) {
-            // הצגת הנתונים כ-HEX
-            const hex = byte.toString(16).padStart(2, '0').toUpperCase();
-            rawMonitorContent.innerHTML += hex + " ";
+        function appendRawDisplay(uint8Arr) {
+            // הופך מערך בייטים למחרוזת HEX ומציג
+            // כדי לא להכביד על הדפדפן, נחתוך אם ארוך מדי
+            const hexStr = Array.from(uint8Arr)
+                .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+                .join(' ');
             
-            // ניקוי אם זה ארוך מדי כדי למנוע תקיעה
-            if (rawMonitorContent.innerText.length > 500) {
-                rawMonitorContent.innerText = rawMonitorContent.innerText.slice(-200);
+            rawMonitorContent.innerHTML += hexStr + " ";
+            
+            if (rawMonitorContent.innerText.length > 2000) {
+                rawMonitorContent.innerText = rawMonitorContent.innerText.slice(-500);
             }
-            // גלילה למטה
-            const container = rawMonitorContent.parentElement;
-            container.scrollTop = container.scrollHeight;
+            rawMonitorContent.parentElement.scrollTop = rawMonitorContent.parentElement.scrollHeight;
         }
 
         function startWatchdog() {
             if (watchdogInterval) clearInterval(watchdogInterval);
             lastDataTime = Date.now();
-            
             watchdogInterval = setInterval(() => {
                 const now = Date.now();
-                // אם עברו 5 שניות בלי מידע
-                if (now - lastDataTime > 5000) {
-                     showError("מחובר, אך לא מתקבל מידע! (דממה בקו). נסי לשנות את המהירות ל-9600 או לבדוק שהמגעים במצח נקיים.");
-                     clearInterval(watchdogInterval); // לא להציק יותר מפעם אחת
+                if (now - lastDataTime > 4000) {
+                     showError("אין נתונים (Silence). נסי לשנות מהירות Baud Rate.");
+                     clearInterval(watchdogInterval); 
                 }
             }, 1000);
         }
 
-        // --- SIMULATION MODE ---
-        function startSimulation() {
-            if (simulationInterval) {
-                clearInterval(simulationInterval);
-                simulationInterval = null;
-                simBtn.innerHTML = '<i class="fa-solid fa-flask"></i> מצב סימולציה';
-                simBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
-                simBtn.classList.add('bg-blue-500', 'hover:bg-blue-600'); 
-                onDisconnected();
-                log('סימולציה הופסקה.');
-                return;
-            }
-
-            log('--- מתחיל סימולציה ---');
-            simBtn.innerHTML = '<i class="fa-solid fa-stop"></i> הפסק סימולציה';
-            
-            updateStatus(true, "Simulated");
-            updateSignal(0);
-
-            simulationInterval = setInterval(() => {
-                const newAtt = Math.min(100, Math.max(0, currentAttention + (Math.random() * 20 - 10)));
-                const newMed = Math.min(100, Math.max(0, currentMeditation + (Math.random() * 20 - 10)));
-                updateMeter('attention', Math.floor(newAtt || 50));
-                updateMeter('meditation', Math.floor(newMed || 50));
-                
-                // סימולציה של ספקטרום מלא
-                const bands = {
-                    delta: Math.floor(Math.random() * 1000000),
-                    theta: Math.floor(Math.random() * 1000000),
-                    alpha: Math.floor(Math.random() * 1000000),
-                    beta: Math.floor(Math.random() * 1000000),
-                    gamma: Math.floor(Math.random() * 1000000)
-                };
-                updateSpectrum(bands);
-
-                // סימולציה של דאטה גולמי
-                flashRx();
-                appendRawData(Math.floor(Math.random() * 255));
-                lastDataTime = Date.now();
-            }, 200); // קצת יותר מהיר בסימולציה
-        }
-
-        // --- GEMINI LOGIC ---
-        async function analyzeBrainWaves() {
-            if (isAnalyzing) return;
-            if (currentAttention === 0 && currentMeditation === 0) {
-                alert("אנא חברי את ה-BrainLink (או הפעילי סימולציה) וודאי שיש קריאת מדדים.");
-                return;
-            }
-            isAnalyzing = true;
-            loadingSpinner.classList.remove('hidden');
-            analyzeBtn.disabled = true;
-            aiResponseArea.classList.add('hidden');
-            aiResponseArea.innerText = "";
-
-            const prompt = `
-                You are a friendly Neurofeedback Expert AI.
-                Current User Brain Metrics (0-100 scale):
-                - Attention (Focus): ${currentAttention}
-                - Meditation (Relaxation): ${currentMeditation}
-                
-                Task:
-                1. Analyze the user's mental state based on these two numbers.
-                2. Give ONE specific, actionable 20-second exercise to optimize their state (e.g., specific breathing technique, looking at a distant object, solving a riddle).
-                3. Suggest a music genre that fits their current vibe.
-                
-                Keep the response short (max 3 sentences), encouraging, and write it in Hebrew.
-            `;
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-
-                if (!response.ok) throw new Error('API Error');
-                const data = await response.json();
-                const aiText = data.candidates[0].content.parts[0].text;
-                aiResponseArea.innerHTML = `<strong>🤖 הניתוח שלי:</strong><br>${aiText}`;
-                aiResponseArea.classList.remove('hidden');
-
-            } catch (error) {
-                console.error(error);
-                aiResponseArea.innerText = "אופס, הייתה בעיה בתקשורת עם ה-AI. נסה שוב מאוחר יותר.";
-                aiResponseArea.classList.remove('hidden');
-            } finally {
-                isAnalyzing = false;
-                loadingSpinner.classList.add('hidden');
-                analyzeBtn.disabled = false;
-            }
-        }
-
-        // --- WEB SERIAL LOGIC (NEW!) ---
+        // --- WEB SERIAL LOGIC (THE MAIN EVENT) ---
         async function connectSerial() {
             if (!('serial' in navigator)) {
-                alert('הדפדפן שלך לא תומך ב-Web Serial (נדרש Chrome/Edge בגרסה עדכנית).');
+                alert('דפדפן זה לא תומך ב-Web Serial. נא להשתמש ב-Chrome/Edge במחשב.');
                 return;
             }
             
@@ -466,22 +283,20 @@
             const selectedBaud = parseInt(baudRateSelect.value);
             
             try {
-                log('מבקש גישה לפורט טורי (COM)...');
+                log('Requesting Port...');
                 const port = await navigator.serial.requestPort();
                 
-                log(`פותח חיבור לפורט במהירות ${selectedBaud}...`);
+                log(`Opening Port at ${selectedBaud}...`);
                 await port.open({ baudRate: selectedBaud }); 
                 
-                log('חיבור טורי נפתח בהצלחה!');
                 updateStatus(true, "Serial");
                 startWatchdog();
-                
                 keepReading = true;
                 readSerialLoop(port);
 
             } catch (err) {
-                log('שגיאה בחיבור טורי: ' + err);
-                showError('לא ניתן להתחבר לפורט. ודאי שהוא לא בשימוש ע"י תוכנה אחרת.');
+                console.error(err);
+                showError('שגיאת התחברות לפורט: ' + err.message);
             }
         }
 
@@ -492,167 +307,85 @@
             try {
                 while (keepReading) {
                     const { value, done } = await reader.read();
-                    if (done) {
-                        reader.releaseLock();
-                        break;
-                    }
+                    if (done) { reader.releaseLock(); break; }
+                    
                     if (value) {
-                        // value is a Uint8Array
+                        // 1. קודם כל - תיעוד גולמי! (הסטטוסקופ)
+                        // אנחנו מדפיסים לקונסול ולמסך *לפני* שהפארסר נוגע בזה
+                        console.log(value); 
+                        appendRawDisplay(value);
+                        flashRx();
+                        lastDataTime = Date.now();
+
+                        // 2. רק אז - שלח לפארסר
                         for (let i = 0; i < value.length; i++) {
                             processByte(value[i]);
                         }
                     }
                 }
             } catch (error) {
-                log('שגיאת קריאה: ' + error);
+                log('Read Error: ' + error);
                 onDisconnected();
             } finally {
                 reader.releaseLock();
             }
         }
 
-        // --- BLUETOOTH LOGIC ---
+        // --- BLUETOOTH LOGIC (LEGACY / BLE MODELS) ---
         async function connectBluetooth() {
             if (simulationInterval) startSimulation();
-
-            if (window.location.protocol === 'file:') {
-                const msg = 'שגיאה: דפדפנים חוסמים גישה מקבצים מקומיים.\nפתרון: הריצי דרך Localhost.';
-                alert(msg); return;
-            }
-
             try {
-                log('פותח סריקת בלוטוס...');
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: KNOWN_SERVICES 
                 });
-
-                log(`נבחר התקן: ${device.name}`);
                 device.addEventListener('gattserverdisconnected', onDisconnected);
-                
-                log('מתחבר לשרת GATT...');
-                const connectPromise = device.gatt.connect();
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 8000));
-
-                try {
-                    server = await Promise.race([connectPromise, timeoutPromise]);
-                } catch (e) {
-                     if (e.message === 'TIMEOUT') throw new Error("GATT_BUSY");
-                     throw e;
-                }
-                
-                log('מחובר! מחפש שירות מתאים...');
+                const server = await device.gatt.connect();
+                // חיפוש פשטני לשירות ראשון שעובד
                 const services = await server.getPrimaryServices();
-                
-                let foundChar = null;
+                let char = null;
                 for (const s of services) {
-                    for (const charUuid of KNOWN_CHARACTERISTICS) {
-                        try {
-                            const c = await s.getCharacteristic(charUuid);
-                            foundChar = c; break;
-                        } catch (err) {}
-                    }
-                    if (foundChar) break;
-                    
-                    try {
-                        const chars = await s.getCharacteristics();
-                        for (const c of chars) if (c.properties.notify) { foundChar = c; break; }
-                    } catch(e) {}
-                    if (foundChar) break;
+                    const chars = await s.getCharacteristics();
+                    char = chars.find(c => c.properties.notify);
+                    if (char) break;
                 }
-
-                if (!foundChar) throw new Error("לא נמצא שירות נתונים.");
-
-                characteristic = foundChar;
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleData);
+                if (!char) throw new Error("No Notify Char Found");
                 
-                log('חיבור בלוטוס הצליח!');
+                await char.startNotifications();
+                char.addEventListener('characteristicvaluechanged', (e) => {
+                    const val = new Uint8Array(e.target.value.buffer);
+                    appendRawDisplay(val); // גם פה נציג גולמי
+                    flashRx();
+                    val.forEach(processByte);
+                });
+                
                 updateStatus(true, "Bluetooth");
-                startWatchdog();
-
             } catch (error) {
-                log(`שגיאה: ${error}`);
-                let userMessage = 'החיבור נכשל.';
-                
-                if (error.name === 'NotFoundError') return; // User cancelled
-                
-                if (error.message.includes('GATT_BUSY') || error.name === 'NetworkError') {
-                    userMessage = '⚠️ המחשב מחזיק את החיבור!\nפתרון: נסי את כפתור "התחבר דרך COM" במקום זאת.';
-                    document.getElementById('helpModal').classList.remove('hidden');
-                }
-                showError(userMessage);
+                showError('BLE Error: ' + error.message);
             }
         }
 
         function onDisconnected() {
-            log('המכשיר התנתק.');
             updateStatus(false);
             keepReading = false;
             if (serialReader) serialReader.cancel();
             if (watchdogInterval) clearInterval(watchdogInterval);
-            
-            currentAttention = 0; currentMeditation = 0;
-            updateMeter('attention', 0); updateMeter('meditation', 0);
-            updateSignal(200);
-            rawMonitorContent.innerHTML = "ממתין לנתונים...";
+            rawMonitorContent.innerHTML += "\n[מנותק]";
         }
 
-        function handleData(event) {
-            const value = event.target.value;
-            for (let i = 0; i < value.byteLength; i++) {
-                processByte(value.getUint8(i));
-            }
-        }
-
-        function updateStatus(connected, type) {
-            if (connected) {
-                let text = "מחובר";
-                let color = "bg-green-500";
-                if (type === "Simulated") { text = "סימולציה"; color = "bg-blue-500"; }
-                if (type === "Serial") { text = "מחובר (COM)"; color = "bg-purple-500"; }
-                
-                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium";
-                statusIndicator.innerHTML = `<span class="w-2 h-2 rounded-full ${color} ml-2"></span>${text}`;
-                
-                dataContainer.classList.remove('opacity-50', 'pointer-events-none');
-                connectBtn.classList.add('hidden');
-                serialBtn.classList.add('hidden');
-                baudRateSelect.classList.add('hidden'); // Hide selector when connected
-                errorMsg.classList.add('hidden');
-                rawMonitorContent.innerHTML = ""; // Clear old logs
-            } else {
-                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
-                statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
-                
-                dataContainer.classList.add('opacity-50', 'pointer-events-none');
-                connectBtn.classList.remove('hidden');
-                serialBtn.classList.remove('hidden');
-                baudRateSelect.classList.remove('hidden');
-            }
-        }
-
-        // --- PARSER (Shared Logic) ---
+        // --- PARSER (THINKGEAR PROTOCOL) ---
+        // Packet: [AA] [AA] [Length] [Payload...] [Checksum]
         let state = 0; 
         let payloadLength = 0;
         let payload = [];
         let payloadBytesRead = 0;
 
         function processByte(byte) {
-            // Update timestamp for Watchdog
-            lastDataTime = Date.now();
-            
-            // Flash RX light & Update Monitor
-            flashRx();
-            if(!document.getElementById('rawMonitorContainer').classList.contains('hidden')) {
-                appendRawData(byte);
-            }
-
             switch (state) {
                 case 0: if (byte === 0xAA) state = 1; break;
                 case 1: if (byte === 0xAA) state = 2; else state = 0; break;
                 case 2: 
-                    if (byte > 169) state = 0;
+                    if (byte > 169) state = 0; // Invalid length for ThinkGear usually
                     else { payloadLength = byte; payload = []; payloadBytesRead = 0; state = 3; }
                     break;
                 case 3:
@@ -660,75 +393,69 @@
                     payloadBytesRead++;
                     if (payloadBytesRead === payloadLength) state = 4;
                     break;
-                case 4: parsePacket(payload); state = 0; break;
+                case 4: 
+                    parsePacket(payload); 
+                    state = 0; 
+                    break;
             }
         }
 
         function parsePacket(data) {
+            // הגיע פאקט מלא ותקין!
             let i = 0;
             while (i < data.length) {
                 const code = data[i];
                 if (code === 0x02) { updateSignal(data[i+1]); i += 2; }
                 else if (code === 0x04) { updateMeter('attention', data[i+1]); i += 2; }
                 else if (code === 0x05) { updateMeter('meditation', data[i+1]); i += 2; }
-                else if (code === 0x80) { i += 3; } // Raw Wave
+                else if (code === 0x80) { i += 3; } 
                 else if (code === 0x83) { 
-                    // ASIC EEG Power (8 ints, 3 bytes each = 24 bytes)
-                    // Structure: [Delta, Theta, LowAlpha, HighAlpha, LowBeta, HighBeta, LowGamma, MidGamma]
+                    // ASIC EEG Power (24 bytes)
                     if (i + 25 <= data.length) {
-                        // הנתונים מגיעים כ-3 בתים (Big Endian)
-                        // דילוג על בייט האורך (0x18 = 24) שנמצא ב-data[i+1]
-                        let offset = i + 2; 
-                        
-                        const parse3Byte = (o) => (data[o] << 16) | (data[o+1] << 8) | data[o+2];
-
-                        const spectrum = {
-                            delta: parse3Byte(offset),
-                            theta: parse3Byte(offset + 3),
-                            lowAlpha: parse3Byte(offset + 6),
-                            highAlpha: parse3Byte(offset + 9),
-                            lowBeta: parse3Byte(offset + 12),
-                            highBeta: parse3Byte(offset + 15),
-                            lowGamma: parse3Byte(offset + 18),
-                            midGamma: parse3Byte(offset + 21)
-                        };
-                        
-                        // איחוד רצועות
-                        const simplifiedSpectrum = {
-                            delta: spectrum.delta,
-                            theta: spectrum.theta,
-                            alpha: (spectrum.lowAlpha + spectrum.highAlpha) / 2,
-                            beta: (spectrum.lowBeta + spectrum.highBeta) / 2,
-                            gamma: (spectrum.lowGamma + spectrum.midGamma) / 2
-                        };
-                        
-                        updateSpectrum(simplifiedSpectrum);
-                        i += 26; // code + length + 24 bytes
-                    } else {
-                        i++;
-                    }
+                        parseSpectrum(data, i + 2);
+                        i += 26; 
+                    } else i++;
                 }
                 else { i++; }
             }
         }
 
-        function updateSpectrum(bands) {
-            // נרמול ערכים ל-0 עד 100 לצורך תצוגה
-            // ערכי ה-EEG יכולים להגיע למיליונים, אז נשתמש בלוגריתם כדי לנרמל
-            const normalize = (val) => {
-                if (val <= 0) return 5;
-                // סקאלה לוגריתמית פשוטה לתצוגה
-                let logVal = Math.log10(val);
-                // נניח שטווח טיפוסי הוא 10^3 עד 10^7
-                let percent = (logVal - 3) * 25; 
-                return Math.min(100, Math.max(5, percent));
+        function parseSpectrum(data, offset) {
+            const p3 = (o) => (data[o] << 16) | (data[o+1] << 8) | data[o+2];
+            const bands = {
+                delta: p3(offset),
+                theta: p3(offset + 3),
+                alpha: (p3(offset + 6) + p3(offset + 9)) / 2,
+                beta: (p3(offset + 12) + p3(offset + 15)) / 2,
+                gamma: (p3(offset + 18) + p3(offset + 21)) / 2
             };
+            
+            const norm = (v) => Math.min(100, Math.max(5, (Math.log10(v || 1) - 3) * 25));
+            
+            document.getElementById('bandDelta').style.height = norm(bands.delta) + '%';
+            document.getElementById('bandTheta').style.height = norm(bands.theta) + '%';
+            document.getElementById('bandAlpha').style.height = norm(bands.alpha) + '%';
+            document.getElementById('bandBeta').style.height = norm(bands.beta) + '%';
+            document.getElementById('bandGamma').style.height = norm(bands.gamma) + '%';
+        }
 
-            document.getElementById('bandDelta').style.height = normalize(bands.delta) + '%';
-            document.getElementById('bandTheta').style.height = normalize(bands.theta) + '%';
-            document.getElementById('bandAlpha').style.height = normalize(bands.alpha) + '%';
-            document.getElementById('bandBeta').style.height = normalize(bands.beta) + '%';
-            document.getElementById('bandGamma').style.height = normalize(bands.gamma) + '%';
+        // --- UI UPDATERS ---
+        function updateStatus(connected, type) {
+            if (connected) {
+                let text = type === "Simulated" ? "סימולציה" : (type === "Serial" ? "מחובר (COM)" : "מחובר (BLE)");
+                let color = type === "Simulated" ? "bg-blue-500" : "bg-green-500";
+                
+                statusIndicator.innerHTML = `<span class="w-2 h-2 rounded-full ${color} ml-2"></span>${text}`;
+                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium";
+                
+                dataContainer.classList.remove('opacity-50', 'pointer-events-none');
+                document.getElementById('helpInfo').classList.add('hidden'); // Hide help on connect
+                errorMsg.classList.add('hidden');
+            } else {
+                statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
+                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
+                dataContainer.classList.add('opacity-50', 'pointer-events-none');
+            }
         }
 
         function updateMeter(type, value) {
@@ -746,8 +473,57 @@
             const el = document.getElementById('signalStatus');
             if (value === 0) el.innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-wifi"></i> מצוין</span>';
             else if (value < 50) el.innerHTML = '<span class="text-yellow-600">רעש קל</span>';
-            else if (value < 200) el.innerHTML = '<span class="text-orange-600">מגע רופף</span>';
-            else el.innerHTML = '<span class="text-red-600">לא מחובר</span>';
+            else if (value === 200) el.innerHTML = '<span class="text-red-600">לא על הראש</span>';
+            else el.innerHTML = '<span class="text-orange-600">אות חלש (' + value + ')</span>';
+        }
+
+        // --- SIMULATION ---
+        function startSimulation() {
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                simBtn.classList.remove('bg-blue-200');
+                onDisconnected();
+                return;
+            }
+            simBtn.classList.add('bg-blue-200');
+            updateStatus(true, "Simulated");
+            simulationInterval = setInterval(() => {
+                const r = () => Math.floor(Math.random() * 100);
+                updateMeter('attention', r());
+                updateMeter('meditation', r());
+                appendRawDisplay(new Uint8Array([0xAA, 0xAA, 0x04, 0x80, 0x02, 0x00, 0x15, 0x23])); // Fake packet
+                flashRx();
+            }, 800);
+        }
+
+        // --- AI ---
+        async function analyzeBrainWaves() {
+            if (isAnalyzing) return;
+            isAnalyzing = true;
+            loadingSpinner.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            aiResponseArea.classList.add('hidden');
+            
+            const prompt = `User EEG: Focus ${currentAttention}, Relax ${currentMeditation}. Brief advice in Hebrew?`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const data = await response.json();
+                aiResponseArea.innerHTML = data.candidates[0].content.parts[0].text;
+                aiResponseArea.classList.remove('hidden');
+            } catch (e) {
+                aiResponseArea.innerHTML = "שגיאה בחיבור ל-AI";
+                aiResponseArea.classList.remove('hidden');
+            } finally {
+                isAnalyzing = false;
+                loadingSpinner.classList.add('hidden');
+                analyzeBtn.disabled = false;
+            }
         }
 
         connectBtn.addEventListener('click', connectBluetooth);
