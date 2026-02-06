@@ -46,34 +46,54 @@
         
         <!-- כפתור עזרה במקרה של אי-מציאת מכשיר -->
         <button onclick="document.getElementById('helpModal').classList.remove('hidden')" class="mt-2 text-xs text-indigo-600 underline hover:text-indigo-800">
-            לא מוצאת את המכשיר ברשימה?
+            לא מצליחה להתחבר? לחצי כאן לעזרה
         </button>
     </header>
 
     <!-- מודל עזרה -->
     <div id="helpModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center z-50">
         <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-sm">
-            <h3 class="text-lg font-bold mb-4 text-red-600">למה ה-BrainLink לא מתחבר?</h3>
-            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
-                <li><strong>הבעיה הנפוצה ביותר:</strong> המכשיר "שמור" (Paired) ב-Bluetooth של המחשב. זה גורם למחשב לחסום את הדפדפן.</li>
-                <li><strong>הפתרון:</strong> כנסי להגדרות Bluetooth במחשב -> הסירי את המכשיר (Forget/Remove).</li>
-                <li><strong>איך יודעים שזה תקין?</strong> הנורה הכחולה ב-BrainLink צריכה <strong>להבהב</strong> (לא דלוקה קבוע).</li>
-                <li><strong>סוללה:</strong> נסי להטעין אותו ל-10 דקות (ואז לנתק מהמטען, אי אפשר להתחבר בטעינה).</li>
-            </ul>
-            <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
-                הבנתי, סוגר
+            <h3 class="text-lg font-bold mb-4 text-indigo-600">מדריך חיבור מהיר</h3>
+            
+            <div class="mb-4">
+                <h4 class="font-bold text-gray-800">אפשרות א': חיבור בלוטוס ישיר (מומלץ לנייד)</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600">
+                    <li>ודאי שהמכשיר <strong>לא מחובר</strong> להגדרות ה-Bluetooth במחשב ("Unpair").</li>
+                    <li>לחצי על "התחבר בלוטוס".</li>
+                </ul>
+            </div>
+
+            <div class="mb-4 border-t pt-4">
+                <h4 class="font-bold text-gray-800">אפשרות ב': חיבור Serial/COM (אם כבר חיברת למחשב)</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600">
+                    <li>ודאי שהמכשיר <strong>כן מחובר</strong> (Paired) בהגדרות ה-Bluetooth של המחשב.</li>
+                    <li>לחצי על "התחבר דרך COM".</li>
+                    <li>בחרי את הפורט שמופיע (בד"כ COM3, COM4 וכו').</li>
+                </ul>
+            </div>
+            
+            <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold py-2 px-4 rounded">
+                הבנתי, תודה
             </button>
         </div>
     </div>
 
     <!-- כפתורי שליטה -->
-    <div class="flex flex-wrap justify-center gap-4 mb-8">
-        <button id="connectBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center gap-2">
+    <div class="flex flex-col gap-3 mb-8 w-full max-w-xs">
+        <!-- כפתור בלוטוס -->
+        <button id="connectBtn" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2">
             <i class="fa-brands fa-bluetooth-b"></i>
-            התחבר למכשיר
+            התחבר בלוטוס (BLE)
         </button>
         
-        <button id="simBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center gap-2">
+        <!-- כפתור סיריאל (חדש!) -->
+        <button id="serialBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition hover:scale-105 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-plug"></i>
+            התחבר דרך COM (מכשיר מצומד)
+        </button>
+        
+        <!-- כפתור סימולציה -->
+        <button id="simBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full shadow transform transition hover:scale-105 flex items-center justify-center gap-2 text-sm">
             <i class="fa-solid fa-flask"></i>
             מצב סימולציה
         </button>
@@ -149,9 +169,12 @@
         let currentMeditation = 0;
         let isAnalyzing = false;
         let simulationInterval = null;
+        let serialReader = null;
+        let keepReading = false;
 
         // אלמנטים ב-DOM
         const connectBtn = document.getElementById('connectBtn');
+        const serialBtn = document.getElementById('serialBtn');
         const simBtn = document.getElementById('simBtn');
         const statusIndicator = document.getElementById('statusIndicator');
         const dataContainer = document.getElementById('dataContainer');
@@ -165,20 +188,11 @@
         // משתנים לבלוטוס
         let device, server, service, characteristic;
         
-        // רשימת UUID אופציונליים לסריקה (מכסה מגוון דגמים)
         const KNOWN_SERVICES = [
-            0xFFE0,                                 // HM-10 / CC2541 (נפוץ מאוד ב-BrainLink Lite)
-            0xAA80,                                 // NeuroSky (דגמים ישנים/מקוריים)
-            "6e400001-b5a3-f393-e0a9-e50e24dcca9e", // Nordic UART (דגמים מודרניים יותר)
-            "0000ffe0-0000-1000-8000-00805f9b34fb"  // הצורה המלאה של FFE0
+            0xFFE0, 0xAA80, "6e400001-b5a3-f393-e0a9-e50e24dcca9e", "0000ffe0-0000-1000-8000-00805f9b34fb"
         ];
-        
-        // מאפיין קריאה (בדרך כלל FFE1)
         const KNOWN_CHARACTERISTICS = [
-            0xFFE1,
-            0xAA81,
-            "6e400003-b5a3-f393-e0a9-e50e24dcca9e",
-            "0000ffe1-0000-1000-8000-00805f9b34fb"
+            0xFFE1, 0xAA81, "6e400003-b5a3-f393-e0a9-e50e24dcca9e", "0000ffe1-0000-1000-8000-00805f9b34fb"
         ];
 
         function log(msg) {
@@ -201,8 +215,8 @@
                 clearInterval(simulationInterval);
                 simulationInterval = null;
                 simBtn.innerHTML = '<i class="fa-solid fa-flask"></i> מצב סימולציה';
-                simBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                simBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                simBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                simBtn.classList.add('bg-blue-500', 'hover:bg-blue-600'); // Reset classes if needed
                 onDisconnected();
                 log('סימולציה הופסקה.');
                 return;
@@ -210,10 +224,8 @@
 
             log('--- מתחיל סימולציה ---');
             simBtn.innerHTML = '<i class="fa-solid fa-stop"></i> הפסק סימולציה';
-            simBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-            simBtn.classList.add('bg-red-600', 'hover:bg-red-700');
             
-            updateStatus(true, true);
+            updateStatus(true, "Simulated");
             updateSignal(0);
 
             simulationInterval = setInterval(() => {
@@ -223,8 +235,6 @@
                 updateMeter('meditation', Math.floor(newMed || 50));
             }, 1000);
         }
-
-        simBtn.addEventListener('click', startSimulation);
 
         // --- GEMINI LOGIC ---
         async function analyzeBrainWaves() {
@@ -277,54 +287,84 @@
             }
         }
 
-        analyzeBtn.addEventListener('click', analyzeBrainWaves);
+        // --- WEB SERIAL LOGIC (NEW!) ---
+        async function connectSerial() {
+            if (!('serial' in navigator)) {
+                alert('הדפדפן שלך לא תומך ב-Web Serial (נדרש Chrome/Edge בגרסה עדכנית).');
+                return;
+            }
+            
+            if (simulationInterval) startSimulation(); // Stop Sim
 
-        // --- BLUETOOTH LOGIC (ENHANCED SCANNER) ---
+            try {
+                log('מבקש גישה לפורט טורי (COM)...');
+                const port = await navigator.serial.requestPort();
+                
+                log('פותח חיבור לפורט (57600 baud)...');
+                // רוב ה-BrainLink החדשים הם 57600, הישנים 9600.
+                // ננסה 57600 כברירת מחדל
+                await port.open({ baudRate: 57600 }); 
+                
+                log('חיבור טורי נפתח בהצלחה!');
+                updateStatus(true, "Serial");
+                
+                keepReading = true;
+                readSerialLoop(port);
 
-        function updateStatus(connected, isSim = false) {
-            if (connected) {
-                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium";
-                statusIndicator.innerHTML = isSim 
-                    ? '<span class="w-2 h-2 rounded-full bg-blue-500 ml-2"></span>סימולציה פעילה'
-                    : '<span class="w-2 h-2 rounded-full bg-green-500 ml-2"></span>מחובר למכשיר';
-                dataContainer.classList.remove('opacity-50', 'pointer-events-none');
-                if (!isSim) connectBtn.classList.add('hidden');
-                errorMsg.classList.add('hidden');
-            } else {
-                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
-                statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
-                dataContainer.classList.add('opacity-50', 'pointer-events-none');
-                connectBtn.classList.remove('hidden');
+            } catch (err) {
+                log('שגיאה בחיבור טורי: ' + err);
+                showError('לא ניתן להתחבר לפורט. ודאי שהוא לא בשימוש ע"י תוכנה אחרת.');
             }
         }
 
+        async function readSerialLoop(port) {
+            const reader = port.readable.getReader();
+            serialReader = reader;
+            
+            try {
+                while (keepReading) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        reader.releaseLock();
+                        break;
+                    }
+                    if (value) {
+                        // value is a Uint8Array
+                        for (let i = 0; i < value.length; i++) {
+                            processByte(value[i]);
+                        }
+                    }
+                }
+            } catch (error) {
+                log('שגיאת קריאה: ' + error);
+                onDisconnected();
+            } finally {
+                reader.releaseLock();
+            }
+        }
+
+        // --- BLUETOOTH LOGIC ---
         async function connectBluetooth() {
             if (simulationInterval) startSimulation();
 
             if (window.location.protocol === 'file:') {
-                const msg = 'שגיאה: דפדפנים חוסמים גישת Bluetooth מקבצים מקומיים (file://).\n\nפתרון: הריצי דרך Localhost.';
+                const msg = 'שגיאה: דפדפנים חוסמים גישה מקבצים מקומיים.\nפתרון: הריצי דרך Localhost.';
                 alert(msg); return;
             }
 
             try {
-                log('פותח סריקת-על (Multi-UUID)...');
-                
-                // בקשת התקן עם רשימת שירותים מורחבת
-                // חובה לציין optionalServices כדי שהדפדפן ירשה גישה אליהם אח"כ
+                log('פותח סריקת בלוטוס...');
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: KNOWN_SERVICES 
                 });
 
-                log(`נבחר התקן: ${device.name} (ID: ${device.id})`);
-                
+                log(`נבחר התקן: ${device.name}`);
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 
                 log('מתחבר לשרת GATT...');
                 const connectPromise = device.gatt.connect();
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('TIMEOUT')), 8000)
-                );
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 8000));
 
                 try {
                     server = await Promise.race([connectPromise, timeoutPromise]);
@@ -333,81 +373,45 @@
                      throw e;
                 }
                 
-                log('מחובר! סורק שירותים זמינים...');
-                
-                // סריקת שירותים דינמית
-                // אנחנו ננסה לקבל את כל השירותים שהגדרנו כ-Optional
-                // ולחפש אחד שאפשר להתחבר אליו
+                log('מחובר! מחפש שירות מתאים...');
                 const services = await server.getPrimaryServices();
-                log(`נמצאו ${services.length} שירותים.`);
                 
-                let foundService = null;
                 let foundChar = null;
-
                 for (const s of services) {
-                    log(`בודק שירות: ${s.uuid}`);
-                    // ניסיון למצוא מאפיין (Characteristic) בתוך השירות הזה
-                    // ננסה את כל המאפיינים המוכרים
                     for (const charUuid of KNOWN_CHARACTERISTICS) {
                         try {
                             const c = await s.getCharacteristic(charUuid);
-                            log(`>>> נמצא מאפיין מתאים: ${charUuid}`);
-                            foundService = s;
-                            foundChar = c;
-                            break; // מצאנו!
-                        } catch (err) {
-                            // לא נמצא המאפיין הזה בשירות הזה, ממשיכים
-                        }
+                            foundChar = c; break;
+                        } catch (err) {}
                     }
                     if (foundChar) break;
                     
-                    // אם לא מצאנו לפי רשימה, ננסה לקחת כל מאפיין שיש לו Notify
                     try {
                         const chars = await s.getCharacteristics();
-                        for (const c of chars) {
-                            if (c.properties.notify) {
-                                log(`>>> נמצא מאפיין עם Notify: ${c.uuid}`);
-                                foundService = s;
-                                foundChar = c;
-                                break;
-                            }
-                        }
+                        for (const c of chars) if (c.properties.notify) { foundChar = c; break; }
                     } catch(e) {}
                     if (foundChar) break;
                 }
 
-                if (!foundChar) {
-                    throw new Error("לא נמצא שירות שידור נתונים (Notify) במכשיר זה.");
-                }
+                if (!foundChar) throw new Error("לא נמצא שירות נתונים.");
 
-                service = foundService;
                 characteristic = foundChar;
-                
-                log('מתחיל האזנה לנתונים...');
                 await characteristic.startNotifications();
                 characteristic.addEventListener('characteristicvaluechanged', handleData);
                 
-                log('חיבור הושלם בהצלחה!');
-                updateStatus(true);
+                log('חיבור בלוטוס הצליח!');
+                updateStatus(true, "Bluetooth");
 
             } catch (error) {
                 log(`שגיאה: ${error}`);
-                console.error(error);
-                
                 let userMessage = 'החיבור נכשל.';
                 
-                if (error.name === 'NotFoundError') {
-                     document.getElementById('helpModal').classList.remove('hidden');
-                     return;
-                }
+                if (error.name === 'NotFoundError') return; // User cancelled
                 
-                if (error.name === 'NetworkError' || error.message.includes('GATT') || error.message === 'GATT_BUSY') {
-                    userMessage = '⚠️ המחשב "חטף" את החיבור!\nחובה לעשות Remove Device בהגדרות המחשב.';
+                if (error.message.includes('GATT_BUSY') || error.name === 'NetworkError') {
+                    userMessage = '⚠️ המחשב מחזיק את החיבור!\nפתרון: נסי את כפתור "התחבר דרך COM" במקום זאת.';
                     document.getElementById('helpModal').classList.remove('hidden');
-                } else {
-                    userMessage = 'שגיאה: ' + error.message;
                 }
-
                 showError(userMessage);
             }
         }
@@ -415,10 +419,11 @@
         function onDisconnected() {
             log('המכשיר התנתק.');
             updateStatus(false);
-            currentAttention = 0;
-            currentMeditation = 0;
-            updateMeter('attention', 0);
-            updateMeter('meditation', 0);
+            keepReading = false;
+            if (serialReader) serialReader.cancel();
+            
+            currentAttention = 0; currentMeditation = 0;
+            updateMeter('attention', 0); updateMeter('meditation', 0);
             updateSignal(200);
         }
 
@@ -429,6 +434,31 @@
             }
         }
 
+        function updateStatus(connected, type) {
+            if (connected) {
+                let text = "מחובר";
+                let color = "bg-green-500";
+                if (type === "Simulated") { text = "סימולציה"; color = "bg-blue-500"; }
+                if (type === "Serial") { text = "מחובר (COM)"; color = "bg-purple-500"; }
+                
+                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium";
+                statusIndicator.innerHTML = `<span class="w-2 h-2 rounded-full ${color} ml-2"></span>${text}`;
+                
+                dataContainer.classList.remove('opacity-50', 'pointer-events-none');
+                connectBtn.classList.add('hidden');
+                serialBtn.classList.add('hidden');
+                errorMsg.classList.add('hidden');
+            } else {
+                statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
+                statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
+                
+                dataContainer.classList.add('opacity-50', 'pointer-events-none');
+                connectBtn.classList.remove('hidden');
+                serialBtn.classList.remove('hidden');
+            }
+        }
+
+        // --- PARSER (Shared Logic) ---
         let state = 0; 
         let payloadLength = 0;
         let payload = [];
@@ -455,26 +485,18 @@
             let i = 0;
             while (i < data.length) {
                 const code = data[i];
-                if (code === 0x02) { 
-                    updateSignal(data[i+1]); i += 2;
-                } else if (code === 0x04) { 
-                    updateMeter('attention', data[i+1]); i += 2;
-                } else if (code === 0x05) { 
-                    updateMeter('meditation', data[i+1]); i += 2;
-                } else if (code === 0x80) { 
-                    i += 3;
-                } else if (code === 0x83) { 
-                    i += 26; 
-                } else {
-                    i++;
-                }
+                if (code === 0x02) { updateSignal(data[i+1]); i += 2; }
+                else if (code === 0x04) { updateMeter('attention', data[i+1]); i += 2; }
+                else if (code === 0x05) { updateMeter('meditation', data[i+1]); i += 2; }
+                else if (code === 0x80) { i += 3; }
+                else if (code === 0x83) { i += 26; }
+                else { i++; }
             }
         }
 
         function updateMeter(type, value) {
             if (type === 'attention') currentAttention = value;
             if (type === 'meditation') currentMeditation = value;
-
             const valEl = document.getElementById(type + 'Value');
             const barEl = document.getElementById(type + 'Bar');
             if(valEl && barEl) {
@@ -492,6 +514,9 @@
         }
 
         connectBtn.addEventListener('click', connectBluetooth);
+        serialBtn.addEventListener('click', connectSerial);
+        simBtn.addEventListener('click', startSimulation);
+        analyzeBtn.addEventListener('click', analyzeBrainWaves);
 
     </script>
 </body>
