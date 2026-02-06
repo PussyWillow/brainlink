@@ -53,12 +53,12 @@
     <!-- מודל עזרה -->
     <div id="helpModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center z-50">
         <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-sm">
-            <h3 class="text-lg font-bold mb-4 text-red-600">למה ה-BrainLink לא מופיע?</h3>
+            <h3 class="text-lg font-bold mb-4 text-red-600">למה ה-BrainLink לא מתחבר?</h3>
             <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
-                <li><strong>הוא כבר מחובר למחשב:</strong> אם עשית "Pairing" בהגדרות המחשב - הוא הופך לבלתי נראה לדפדפן.</li>
+                <li><strong>הבעיה הנפוצה ביותר:</strong> המכשיר "שמור" (Paired) ב-Bluetooth של המחשב. זה גורם למחשב לחסום את הדפדפן.</li>
                 <li><strong>הפתרון:</strong> כנסי להגדרות Bluetooth במחשב -> הסירי את המכשיר (Forget/Remove).</li>
-                <li><strong>הוא מחובר לטלפון:</strong> ודאי שהבלוטוס בטלפון כבוי.</li>
-                <li><strong>סוללה:</strong> נסי להטעין אותו ל-10 דקות (ואז לנתק מהמטען).</li>
+                <li><strong>איך יודעים שזה תקין?</strong> הנורה הכחולה ב-BrainLink צריכה <strong>להבהב</strong> (לא דלוקה קבוע).</li>
+                <li><strong>סוללה:</strong> נסי להטעין אותו ל-10 דקות (ואז לנתק מהמטען, אי אפשר להתחבר בטעינה).</li>
             </ul>
             <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
                 הבנתי, סוגר
@@ -178,7 +178,9 @@
         function showError(msg) {
             errorText.innerText = msg;
             errorMsg.classList.remove('hidden');
-            setTimeout(() => errorMsg.classList.add('hidden'), 10000); // נעלם אחרי 10 שניות
+            // אם זו שגיאה של "חטיפה", נשאיר אותה ליותר זמן
+            const duration = msg.includes('חטף') ? 15000 : 10000;
+            setTimeout(() => errorMsg.classList.add('hidden'), duration);
         }
 
         // --- SIMULATION MODE ---
@@ -295,18 +297,10 @@
             }
 
             try {
-                log('מחפש BrainLink...');
+                log('פותח סריקה לכל התקני ה-Bluetooth בסביבה (ללא סינון)...');
                 
-                // --- חיפוש חכם ורחב ---
-                // אנו מנסים לתפוס את המכשיר או לפי שם, או לפי השירות הטכני (FFE0)
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: 'Brain' },        // רוב מכשירי BrainLink
-                        { namePrefix: 'Macrotellect' }, // שם היצרן
-                        { namePrefix: 'NeuroSky' },     // לפעמים מזדהים ככה
-                        { namePrefix: 'JDY' },          // שם השבב הגנרי
-                        { services: [SERVICE_UUID] }    // כל מכשיר שמשדר נתונים סריאליים
-                    ],
+                    acceptAllDevices: true,
                     optionalServices: [SERVICE_UUID] 
                 });
 
@@ -315,13 +309,30 @@
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 
                 log('מנסה להתחבר לשרת GATT...');
-                server = await device.gatt.connect();
+                
+                // --- תיקון לבעיית "נמצא אך לא מתחבר" ---
+                // הוספת מנגנון timeout למקרה שהדפדפן נתקע בגלל שהמחשב מחזיק את החיבור
+                const connectPromise = device.gatt.connect();
+                
+                // נחכה 5 שניות לחיבור
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('TIMEOUT')), 8000)
+                );
+
+                try {
+                    server = await Promise.race([connectPromise, timeoutPromise]);
+                } catch (e) {
+                     if (e.message === 'TIMEOUT') {
+                         throw new Error("GATT_BUSY"); // זריקה ידנית כדי לתפוס למטה
+                     }
+                     throw e;
+                }
 
                 log('מחפש שירות ראשי (FFE0)...');
                 try {
                     service = await server.getPrimaryService(SERVICE_UUID);
                 } catch (e) {
-                    throw new Error("לא ניתן למצוא את השירות FFE0. ודאי שהמכשיר אינו מחובר כבר לתוכנה אחרת.");
+                    throw new Error("המכשיר חובר, אבל לא מצאתי בו שירות BrainLink (FFE0). נסי לבחור מכשיר אחר ברשימה.");
                 }
 
                 log('מחפש מאפיין קריאה (FFE1)...');
@@ -340,14 +351,18 @@
                 let userMessage = 'החיבור נכשל.';
                 
                 if (error.name === 'NotFoundError') {
-                     // המשתמש ביטל את החלון או לא מצא
-                     // לא נקפיץ שגיאה רועשת, רק נפתח את ההסבר
+                     // המשתמש ביטל את החלון
                      document.getElementById('helpModal').classList.remove('hidden');
                      return;
                 }
                 
-                if (error.name === 'NetworkError' || error.message.includes('GATT')) {
-                    userMessage = '⚠️ המחשב "חטף" את החיבור!\nכנסי להגדרות Bluetooth במחשב ועשי "שכח התקן" (Remove Device).';
+                // זיהוי מדויק של הבעיה שתיארת
+                if (error.name === 'NetworkError' || error.message.includes('GATT') || error.message === 'GATT_BUSY') {
+                    userMessage = '⚠️ זה המקרה הקלאסי!\nהמכשיר זוהה אך המחשב "חטף" את החיבור.\n\nחובה להיכנס להגדרות Bluetooth במחשב ולעשות "Remove Device".';
+                    // פתיחה אוטומטית של העזרה במקרה הזה
+                    document.getElementById('helpModal').classList.remove('hidden');
+                } else if (error.message.includes('FFE0')) {
+                    userMessage = '⚠️ התחברת למכשיר הלא נכון.\nזה מכשיר בלוטות\', אבל לא BrainLink.';
                 }
 
                 showError(userMessage);
