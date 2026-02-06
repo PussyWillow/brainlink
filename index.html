@@ -43,7 +43,28 @@
             <p class="font-bold">שגיאת חיבור!</p>
             <p id="errorText">נא לוודא שהמכשיר דלוק.</p>
         </div>
+        
+        <!-- כפתור עזרה במקרה של אי-מציאת מכשיר -->
+        <button onclick="document.getElementById('helpModal').classList.remove('hidden')" class="mt-2 text-xs text-indigo-600 underline hover:text-indigo-800">
+            לא מוצאת את המכשיר ברשימה?
+        </button>
     </header>
+
+    <!-- מודל עזרה -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-sm">
+            <h3 class="text-lg font-bold mb-4 text-red-600">למה ה-BrainLink לא מופיע?</h3>
+            <ul class="list-disc list-inside text-sm text-gray-700 space-y-2 mb-4">
+                <li><strong>הוא כבר מחובר למחשב:</strong> אם עשית "Pairing" בהגדרות המחשב - הוא הופך לבלתי נראה לדפדפן.</li>
+                <li><strong>הפתרון:</strong> כנסי להגדרות Bluetooth במחשב -> הסירי את המכשיר (Forget/Remove).</li>
+                <li><strong>הוא מחובר לטלפון:</strong> ודאי שהבלוטוס בטלפון כבוי.</li>
+                <li><strong>סוללה:</strong> נסי להטעין אותו ל-10 דקות (ואז לנתק מהמטען).</li>
+            </ul>
+            <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
+                הבנתי, סוגר
+            </button>
+        </div>
+    </div>
 
     <!-- כפתורי שליטה -->
     <div class="flex flex-wrap justify-center gap-4 mb-8">
@@ -274,12 +295,18 @@
             }
 
             try {
-                log('מבקש גישה לכל התקני ה-Bluetooth בסביבה...');
+                log('מחפש BrainLink...');
                 
-                // שינוי לשיטת "קבל הכל" (Accept All Devices)
-                // זה יציג את כל המכשירים בסביבה ויעקוף בעיות של שמות לא תואמים
+                // --- חיפוש חכם ורחב ---
+                // אנו מנסים לתפוס את המכשיר או לפי שם, או לפי השירות הטכני (FFE0)
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
+                    filters: [
+                        { namePrefix: 'Brain' },        // רוב מכשירי BrainLink
+                        { namePrefix: 'Macrotellect' }, // שם היצרן
+                        { namePrefix: 'NeuroSky' },     // לפעמים מזדהים ככה
+                        { namePrefix: 'JDY' },          // שם השבב הגנרי
+                        { services: [SERVICE_UUID] }    // כל מכשיר שמשדר נתונים סריאליים
+                    ],
                     optionalServices: [SERVICE_UUID] 
                 });
 
@@ -294,7 +321,7 @@
                 try {
                     service = await server.getPrimaryService(SERVICE_UUID);
                 } catch (e) {
-                    throw new Error("לא ניתן למצוא את השירות FFE0. המכשיר כנראה תפוס ע\"י המחשב או לא תואם.");
+                    throw new Error("לא ניתן למצוא את השירות FFE0. ודאי שהמכשיר אינו מחובר כבר לתוכנה אחרת.");
                 }
 
                 log('מחפש מאפיין קריאה (FFE1)...');
@@ -307,16 +334,20 @@
                 updateStatus(true);
 
             } catch (error) {
-                log(`שגיאה קריטית: ${error}`);
+                log(`שגיאה: ${error}`);
                 console.error(error);
                 
                 let userMessage = 'החיבור נכשל.';
                 
-                // טיפול בשגיאות נפוצות
+                if (error.name === 'NotFoundError') {
+                     // המשתמש ביטל את החלון או לא מצא
+                     // לא נקפיץ שגיאה רועשת, רק נפתח את ההסבר
+                     document.getElementById('helpModal').classList.remove('hidden');
+                     return;
+                }
+                
                 if (error.name === 'NetworkError' || error.message.includes('GATT')) {
-                    userMessage = '⚠️ המחשב "חטף" את החיבור!\n1. כנסי להגדרות Bluetooth במחשב.\n2. עשי "שכח התקן" (Unpair) ל-BrainLink.\n3. נסי שוב כאן.';
-                } else if (error.name === 'NotFoundError') {
-                    userMessage = 'המכשיר לא נמצא או שהשירות לא נתמך.';
+                    userMessage = '⚠️ המחשב "חטף" את החיבור!\nכנסי להגדרות Bluetooth במחשב ועשי "שכח התקן" (Remove Device).';
                 }
 
                 showError(userMessage);
