@@ -55,7 +55,7 @@
         
         <!-- הודעת אזהרה דינמית -->
         <div id="errorMsg" class="hidden mt-4 bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 text-right text-sm" role="alert">
-            <p class="font-bold">שגיאת חיבור!</p>
+            <p class="font-bold">⚠️ שים לב:</p>
             <p id="errorText">נא לוודא שהמכשיר דלוק.</p>
         </div>
         
@@ -173,11 +173,24 @@
                 <i class="fa-solid fa-circle-question"></i> לא ידוע
             </div>
         </div>
+
+        <!-- צג נתונים גולמיים (לדיבאג) -->
+        <div class="mt-8 w-full">
+            <button onclick="toggleRawMonitor()" class="text-xs text-gray-500 underline mb-2 w-full text-center hover:text-indigo-600">
+                <i class="fa-solid fa-bug"></i> לא רואה כלום? לחצי כאן לצג הנתונים הגולמיים
+            </button>
+            <div id="rawMonitorContainer" class="hidden">
+                <div class="bg-gray-800 text-green-400 p-3 rounded-lg font-mono text-xs h-32 overflow-y-auto dir-ltr text-left shadow-inner">
+                    <div class="text-gray-500 border-b border-gray-700 pb-1 mb-1">RAW DATA STREAM (HEX):</div>
+                    <div id="rawMonitorContent" class="break-all">ממתין לנתונים...</div>
+                </div>
+            </div>
+        </div>
         
-        <!-- לוג דיבאג -->
-        <div class="mt-8">
-            <button onclick="document.getElementById('debugLog').classList.toggle('hidden')" class="text-xs text-gray-400 underline mb-2">הצג/הסתר לוג טכני</button>
-            <div id="debugLog" class="hidden h-32 overflow-y-auto bg-gray-900 text-green-400 text-xs p-3 rounded font-mono font-left dir-ltr text-left"></div>
+        <!-- לוג דיבאג ישן -->
+        <div class="mt-4">
+            <button onclick="document.getElementById('debugLog').classList.toggle('hidden')" class="text-xs text-gray-400 underline mb-2">הצג/הסתר לוג מערכת</button>
+            <div id="debugLog" class="hidden h-32 overflow-y-auto bg-gray-900 text-gray-300 text-xs p-3 rounded font-mono font-left dir-ltr text-left"></div>
         </div>
     </div>
 
@@ -192,6 +205,10 @@
         let simulationInterval = null;
         let serialReader = null;
         let keepReading = false;
+        
+        // משתני דיבאג ו-Watchdog
+        let lastDataTime = 0;
+        let watchdogInterval = null;
 
         // אלמנטים ב-DOM
         const connectBtn = document.getElementById('connectBtn');
@@ -207,6 +224,7 @@
         const errorText = document.getElementById('errorText');
         const baudRateSelect = document.getElementById('baudRate');
         const rxLight = document.getElementById('rxLight');
+        const rawMonitorContent = document.getElementById('rawMonitorContent');
         
         // משתנים לבלוטוס
         let device, server, service, characteristic;
@@ -228,7 +246,8 @@
         function showError(msg) {
             errorText.innerText = msg;
             errorMsg.classList.remove('hidden');
-            const duration = msg.includes('חטף') ? 15000 : 10000;
+            // אם זו שגיאה של "חטיפה" או דממה, נשאיר להרבה זמן
+            const duration = msg.includes('דממה') || msg.includes('חטף') ? 15000 : 8000;
             setTimeout(() => errorMsg.classList.add('hidden'), duration);
         }
 
@@ -236,6 +255,39 @@
             rxLight.classList.remove('data-pulse');
             void rxLight.offsetWidth; // Trigger reflow
             rxLight.classList.add('data-pulse');
+        }
+
+        function toggleRawMonitor() {
+            const el = document.getElementById('rawMonitorContainer');
+            el.classList.toggle('hidden');
+        }
+
+        function appendRawData(byte) {
+            // הצגת הנתונים כ-HEX
+            const hex = byte.toString(16).padStart(2, '0').toUpperCase();
+            rawMonitorContent.innerHTML += hex + " ";
+            
+            // ניקוי אם זה ארוך מדי כדי למנוע תקיעה
+            if (rawMonitorContent.innerText.length > 500) {
+                rawMonitorContent.innerText = rawMonitorContent.innerText.slice(-200);
+            }
+            // גלילה למטה
+            const container = rawMonitorContent.parentElement;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function startWatchdog() {
+            if (watchdogInterval) clearInterval(watchdogInterval);
+            lastDataTime = Date.now();
+            
+            watchdogInterval = setInterval(() => {
+                const now = Date.now();
+                // אם עברו 5 שניות בלי מידע
+                if (now - lastDataTime > 5000) {
+                     showError("מחובר, אך לא מתקבל מידע! (דממה בקו). נסי לשנות את המהירות ל-9600 או לבדוק שהמגעים במצח נקיים.");
+                     clearInterval(watchdogInterval); // לא להציק יותר מפעם אחת
+                }
+            }, 1000);
         }
 
         // --- SIMULATION MODE ---
@@ -262,8 +314,12 @@
                 const newMed = Math.min(100, Math.max(0, currentMeditation + (Math.random() * 20 - 10)));
                 updateMeter('attention', Math.floor(newAtt || 50));
                 updateMeter('meditation', Math.floor(newMed || 50));
+                
+                // סימולציה של דאטה גולמי
                 flashRx();
-            }, 1000);
+                appendRawData(Math.floor(Math.random() * 255));
+                lastDataTime = Date.now();
+            }, 200); // קצת יותר מהיר בסימולציה
         }
 
         // --- GEMINI LOGIC ---
@@ -337,6 +393,7 @@
                 
                 log('חיבור טורי נפתח בהצלחה!');
                 updateStatus(true, "Serial");
+                startWatchdog();
                 
                 keepReading = true;
                 readSerialLoop(port);
@@ -431,6 +488,7 @@
                 
                 log('חיבור בלוטוס הצליח!');
                 updateStatus(true, "Bluetooth");
+                startWatchdog();
 
             } catch (error) {
                 log(`שגיאה: ${error}`);
@@ -451,10 +509,12 @@
             updateStatus(false);
             keepReading = false;
             if (serialReader) serialReader.cancel();
+            if (watchdogInterval) clearInterval(watchdogInterval);
             
             currentAttention = 0; currentMeditation = 0;
             updateMeter('attention', 0); updateMeter('meditation', 0);
             updateSignal(200);
+            rawMonitorContent.innerHTML = "ממתין לנתונים...";
         }
 
         function handleData(event) {
@@ -479,6 +539,7 @@
                 serialBtn.classList.add('hidden');
                 baudRateSelect.classList.add('hidden'); // Hide selector when connected
                 errorMsg.classList.add('hidden');
+                rawMonitorContent.innerHTML = ""; // Clear old logs
             } else {
                 statusIndicator.className = "mt-4 inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-600 text-sm font-medium";
                 statusIndicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 ml-2"></span>מנותק';
@@ -497,8 +558,14 @@
         let payloadBytesRead = 0;
 
         function processByte(byte) {
-            // Flash RX light on every byte
+            // Update timestamp for Watchdog
+            lastDataTime = Date.now();
+            
+            // Flash RX light & Update Monitor
             flashRx();
+            if(!document.getElementById('rawMonitorContainer').classList.contains('hidden')) {
+                appendRawData(byte);
+            }
 
             switch (state) {
                 case 0: if (byte === 0xAA) state = 1; break;
