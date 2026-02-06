@@ -33,6 +33,24 @@
             animation: pulse-yellow 0.2s ease-out;
             background-color: #fbbf24 !important; /* Yellow-400 */
         }
+        /* סגנון לגרף הספקטרום */
+        .spectrum-bar-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            height: 100px;
+            width: 100%;
+            background-color: #f3f4f6;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .spectrum-bar {
+            width: 100%;
+            transition: height 0.3s ease;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
@@ -163,6 +181,59 @@
             </div>
             <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                 <div id="meditationBar" class="meter-fill bg-teal-500 h-4 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <!-- ספקטרום גלי מוח (חדש!) -->
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">🌈 ספקטרום גלי מוח</h2>
+            <div class="grid grid-cols-5 gap-2 text-center h-32 items-end">
+                
+                <!-- Delta -->
+                <div class="flex flex-col gap-1 h-full justify-end">
+                    <div class="spectrum-bar-container">
+                        <div id="bandDelta" class="spectrum-bar bg-gray-400" style="height: 10%;"></div>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500">Delta</span>
+                    <span class="text-[10px] text-gray-400">שינה</span>
+                </div>
+
+                <!-- Theta -->
+                <div class="flex flex-col gap-1 h-full justify-end">
+                    <div class="spectrum-bar-container">
+                        <div id="bandTheta" class="spectrum-bar bg-blue-400" style="height: 10%;"></div>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500">Theta</span>
+                    <span class="text-[10px] text-gray-400">דמיון</span>
+                </div>
+
+                <!-- Alpha -->
+                <div class="flex flex-col gap-1 h-full justify-end">
+                    <div class="spectrum-bar-container">
+                        <div id="bandAlpha" class="spectrum-bar bg-green-400" style="height: 10%;"></div>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500">Alpha</span>
+                    <span class="text-[10px] text-gray-400">רגיעה</span>
+                </div>
+
+                <!-- Beta -->
+                <div class="flex flex-col gap-1 h-full justify-end">
+                    <div class="spectrum-bar-container">
+                        <div id="bandBeta" class="spectrum-bar bg-yellow-400" style="height: 10%;"></div>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500">Beta</span>
+                    <span class="text-[10px] text-gray-400">מיקוד</span>
+                </div>
+
+                <!-- Gamma -->
+                <div class="flex flex-col gap-1 h-full justify-end">
+                    <div class="spectrum-bar-container">
+                        <div id="bandGamma" class="spectrum-bar bg-red-400" style="height: 10%;"></div>
+                    </div>
+                    <span class="text-xs font-bold text-gray-500">Gamma</span>
+                    <span class="text-[10px] text-gray-400">תובנה</span>
+                </div>
+
             </div>
         </div>
 
@@ -315,6 +386,16 @@
                 updateMeter('attention', Math.floor(newAtt || 50));
                 updateMeter('meditation', Math.floor(newMed || 50));
                 
+                // סימולציה של ספקטרום מלא
+                const bands = {
+                    delta: Math.floor(Math.random() * 1000000),
+                    theta: Math.floor(Math.random() * 1000000),
+                    alpha: Math.floor(Math.random() * 1000000),
+                    beta: Math.floor(Math.random() * 1000000),
+                    gamma: Math.floor(Math.random() * 1000000)
+                };
+                updateSpectrum(bands);
+
                 // סימולציה של דאטה גולמי
                 flashRx();
                 appendRawData(Math.floor(Math.random() * 255));
@@ -590,10 +671,64 @@
                 if (code === 0x02) { updateSignal(data[i+1]); i += 2; }
                 else if (code === 0x04) { updateMeter('attention', data[i+1]); i += 2; }
                 else if (code === 0x05) { updateMeter('meditation', data[i+1]); i += 2; }
-                else if (code === 0x80) { i += 3; }
-                else if (code === 0x83) { i += 26; }
+                else if (code === 0x80) { i += 3; } // Raw Wave
+                else if (code === 0x83) { 
+                    // ASIC EEG Power (8 ints, 3 bytes each = 24 bytes)
+                    // Structure: [Delta, Theta, LowAlpha, HighAlpha, LowBeta, HighBeta, LowGamma, MidGamma]
+                    if (i + 25 <= data.length) {
+                        // הנתונים מגיעים כ-3 בתים (Big Endian)
+                        // דילוג על בייט האורך (0x18 = 24) שנמצא ב-data[i+1]
+                        let offset = i + 2; 
+                        
+                        const parse3Byte = (o) => (data[o] << 16) | (data[o+1] << 8) | data[o+2];
+
+                        const spectrum = {
+                            delta: parse3Byte(offset),
+                            theta: parse3Byte(offset + 3),
+                            lowAlpha: parse3Byte(offset + 6),
+                            highAlpha: parse3Byte(offset + 9),
+                            lowBeta: parse3Byte(offset + 12),
+                            highBeta: parse3Byte(offset + 15),
+                            lowGamma: parse3Byte(offset + 18),
+                            midGamma: parse3Byte(offset + 21)
+                        };
+                        
+                        // איחוד רצועות
+                        const simplifiedSpectrum = {
+                            delta: spectrum.delta,
+                            theta: spectrum.theta,
+                            alpha: (spectrum.lowAlpha + spectrum.highAlpha) / 2,
+                            beta: (spectrum.lowBeta + spectrum.highBeta) / 2,
+                            gamma: (spectrum.lowGamma + spectrum.midGamma) / 2
+                        };
+                        
+                        updateSpectrum(simplifiedSpectrum);
+                        i += 26; // code + length + 24 bytes
+                    } else {
+                        i++;
+                    }
+                }
                 else { i++; }
             }
+        }
+
+        function updateSpectrum(bands) {
+            // נרמול ערכים ל-0 עד 100 לצורך תצוגה
+            // ערכי ה-EEG יכולים להגיע למיליונים, אז נשתמש בלוגריתם כדי לנרמל
+            const normalize = (val) => {
+                if (val <= 0) return 5;
+                // סקאלה לוגריתמית פשוטה לתצוגה
+                let logVal = Math.log10(val);
+                // נניח שטווח טיפוסי הוא 10^3 עד 10^7
+                let percent = (logVal - 3) * 25; 
+                return Math.min(100, Math.max(5, percent));
+            };
+
+            document.getElementById('bandDelta').style.height = normalize(bands.delta) + '%';
+            document.getElementById('bandTheta').style.height = normalize(bands.theta) + '%';
+            document.getElementById('bandAlpha').style.height = normalize(bands.alpha) + '%';
+            document.getElementById('bandBeta').style.height = normalize(bands.beta) + '%';
+            document.getElementById('bandGamma').style.height = normalize(bands.gamma) + '%';
         }
 
         function updateMeter(type, value) {
