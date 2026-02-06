@@ -274,15 +274,12 @@
             }
 
             try {
-                log('מחפש BrainLink...');
+                log('מבקש גישה לכל התקני ה-Bluetooth בסביבה...');
                 
-                // שימוש בפילטרים מתירניים יותר
+                // שינוי לשיטת "קבל הכל" (Accept All Devices)
+                // זה יציג את כל המכשירים בסביבה ויעקוף בעיות של שמות לא תואמים
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: 'BrainLink' },
-                        { namePrefix: 'Brain' },
-                        { services: [SERVICE_UUID] } 
-                    ],
+                    acceptAllDevices: true,
                     optionalServices: [SERVICE_UUID] 
                 });
 
